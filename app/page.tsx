@@ -108,4 +108,74 @@ export default function HomePage() {
                   <table className="min-w-[900px] w-full border-separate border-spacing-0">
                     <thead>
                       <tr>
-                        <th className="sticky left-0 z-10 bg-white px-3 py-3 text-left text-xs font-semibold uppercase tracking
+                        <th className="sticky left-0 z-10 bg-white px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 ring-1 ring-slate-200">
+                          Jogo (data/hora)
+                        </th>
+                        {data.players.map((p) => (
+                          <th
+                            key={p.id}
+                            className="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wide text-slate-600 ring-1 ring-slate-200"
+                          >
+                            {p.name}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+
+                    <tbody>
+                      {data.games.map((g, rowIdx) => (
+                        <tr key={g.id}>
+                          <td className="sticky left-0 z-10 bg-white px-3 py-3 text-sm text-slate-900 ring-1 ring-slate-200">
+                            <div className="font-semibold">
+                              {g.team1} <span className="text-slate-400">x</span> {g.team2}
+                            </div>
+                            <div className="mt-1 text-xs text-slate-500">{fmtKickoff(g.kickoff_at)}</div>
+                          </td>
+
+                          {data.players.map((p, colIdx) => {
+                            const cell = data.grid?.[rowIdx]?.[colIdx];
+                            const status = cell?.status ?? "MISSING";
+
+                            if (!data.isRevealed) {
+                              return (
+                                <td
+                                  key={p.id}
+                                  className="px-3 py-3 text-center ring-1 ring-slate-200"
+                                  title={status === "SENT" ? "Palpite enviado" : "Sem palpite"}
+                                >
+                                  {status === "SENT" ? <Dot kind="green" /> : <Dot kind="red" />}
+                                </td>
+                              );
+                            }
+
+                            return (
+                              <td
+                                key={p.id}
+                                className="px-3 py-3 text-center text-sm font-medium text-slate-900 ring-1 ring-slate-200"
+                              >
+                                {cell?.text ?? "—"}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+
+                  <div className="mt-3 text-xs text-slate-500">
+                    <span className="font-semibold">Status:</span>{" "}
+                    <span className="inline-flex items-center gap-1"><Dot kind="green" /> enviado</span>{" "}
+                    <span className="mx-2">•</span>
+                    <span className="inline-flex items-center gap-1"><Dot kind="red" /> pendente</span>
+                    <span className="mx-2">•</span>
+                    <span>revela automaticamente no kickoff do 1º jogo do bloco</span>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    </main>
+  );
+}
