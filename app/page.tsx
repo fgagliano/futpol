@@ -160,7 +160,8 @@ export default function HomePage() {
                           })}
                         </div>
 
-         
+         </div>
+                    ))}
 
                     <div className="pt-1 text-xs text-slate-500">
                       <span className="font-semibold">Status:</span>{" "}
