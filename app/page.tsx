@@ -89,27 +89,27 @@ export default function HomePage() {
   return (
    <main className="min-h-screen bg-slate-50 p-4 sm:p-6">
   {/* AÇÕES PRINCIPAIS (TOPO) */}
-  <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-    <a
-      href="/palpitar"
-      className="group rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200 hover:ring-emerald-200 hover:bg-emerald-50 transition"
-    >
-      <div className="mt-1 text-lg font-extrabold text-slate-900 group-hover:text-emerald-800">
-        Dê seus Palpites
-      </div>
-     
-    </a>
+  {/* AÇÕES PRINCIPAIS (TOPO) */}
+<div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+  <a
+    href="/palpitar"
+    className="group rounded-2xl bg-emerald-600 p-6 text-center shadow-sm ring-1 ring-emerald-600 transition hover:bg-emerald-700"
+  >
+    <div className="text-2xl font-extrabold tracking-tight text-white sm:text-3xl">
+      Dê seus Palpites
+    </div>
+  </a>
 
-    <a
-      href="/resultados"
-      className="group rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200 hover:ring-blue-200 hover:bg-blue-50 transition"
-    >
-      <div className="mt-1 text-lg font-extrabold text-slate-900 group-hover:text-blue-800">
-        Confira o Extrato da Rodada
-      </div>
-     
-    </a>
-  </div>
+  <a
+    href="/resultados"
+    className="group rounded-2xl bg-white p-6 text-center shadow-sm ring-1 ring-slate-200 transition hover:bg-blue-50 hover:ring-blue-200"
+  >
+    <div className="text-xl font-extrabold tracking-tight text-slate-900 sm:text-2xl group-hover:text-blue-800">
+      Confira o Extrato da Rodada
+    </div>
+  </a>
+</div>
+
 
   
 
