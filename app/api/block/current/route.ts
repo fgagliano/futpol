@@ -1,11 +1,16 @@
+
 import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { decryptChoice } from "@/lib/crypto";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 type Choice = "TEAM1" | "DRAW" | "TEAM2";
 
 export async function GET() {
   // bloco atual = maior rodada
+  import { NextResponse } from "next/server";
+
   const [block] = await sql`
     select id, round
     from public.blocks
