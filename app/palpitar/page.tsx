@@ -12,6 +12,8 @@ type ApiResp = {
   grid: any[][];
 };
 
+type MeResp = { ok: boolean; player?: { id: string; name: string } };
+
 function fmt(iso: string) {
   const d = new Date(iso);
   return d.toLocaleString("pt-BR", {
@@ -37,7 +39,7 @@ function Badge({ revealed }: { revealed: boolean }) {
 export default function PalpitarPage() {
   const [data, setData] = useState<ApiResp | null>(null);
 
-  const [playerId, setPlayerId] = useState("");
+  const [me, setMe] = useState<{ id: string; name: string } | null>(null);
   const [saved, setSaved] = useState<Record<string, Choice>>({});
 
   const [msg, setMsg] = useState<string | null>(null);
@@ -50,25 +52,33 @@ export default function PalpitarPage() {
     setData(await r.json());
   }
 
-  async function loadSaved(pid: string) {
-    if (!pid) {
-      setSaved({});
+  async function loadMe() {
+    const r = await fetch("/api/auth/me", { cache: "no-store" });
+    const j = (await r.json()) as MeResp;
+    if (!r.ok || !j?.ok || !j.player) {
+      setMe(null);
       return;
     }
-    const r = await fetch(`/api/pick/get?playerId=${encodeURIComponent(pid)}`, {
-      cache: "no-store",
-    });
+    setMe(j.player);
+  }
+
+  async function loadSaved() {
+    const r = await fetch(`/api/pick/get`, { cache: "no-store" });
     const j = await r.json();
     setSaved(j?.picks || {});
   }
 
   useEffect(() => {
-    load();
+    (async () => {
+      await loadMe();
+      await load();
+      await loadSaved();
+    })();
   }, []);
 
   async function sendPick(gameId: string, choice: Choice) {
-    if (!playerId) {
-      setMsg("Escolha o jogador primeiro.");
+    if (!me?.id) {
+      setMsg("Você não está logado.");
       setMsgKind("err");
       return;
     }
@@ -89,7 +99,7 @@ export default function PalpitarPage() {
       const r = await fetch("/api/pick", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ playerId, gameId, choice }),
+        body: JSON.stringify({ gameId, choice }),
       });
 
       const j = await r.json();
@@ -109,6 +119,11 @@ export default function PalpitarPage() {
     }
   }
 
+  async function logout() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    window.location.href = "/login?next=/palpitar";
+  }
+
   return (
     <main className="min-h-screen bg-slate-50 p-4 sm:p-6">
       <div className="mx-auto max-w-3xl">
@@ -118,40 +133,31 @@ export default function PalpitarPage() {
               Palpitar
             </h1>
             <p className="mt-1 text-sm text-slate-600">
-              Escolha seu nome e envie os palpites do bloco atual.
+              Envie seus palpites do bloco atual.
             </p>
           </div>
+
+          {me && (
+            <button
+              onClick={logout}
+              className="rounded-2xl bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
+            >
+              Sair
+            </button>
+          )}
         </div>
 
         <div className="mt-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
           <div className="flex items-center justify-between gap-3">
-            <label className="block text-sm font-semibold text-slate-700">
-              Jogador
-            </label>
+            <div>
+              <div className="text-sm font-semibold text-slate-700">Jogador</div>
+              <div className="mt-1 text-base font-extrabold text-slate-900">
+                {me ? me.name : "—"}
+              </div>
+            </div>
 
             {data?.block && <Badge revealed={!!data.isRevealed} />}
           </div>
-
-          <select
-            value={playerId}
-            onChange={async (e) => {
-              const id = e.target.value;
-              setPlayerId(id);
-              setMsg(null);
-              setMsgKind(null);
-              setSaved({});
-              if (!id) return;
-              await loadSaved(id);
-            }}
-            className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600"
-          >
-            <option value="">Selecione…</option>
-            {data?.players?.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
 
           {data?.block && (
             <div className="mt-3 text-xs text-slate-500">
