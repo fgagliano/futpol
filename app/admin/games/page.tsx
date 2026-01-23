@@ -18,13 +18,23 @@ type ApiByRoundResp = {
 };
 
 type GameForm = {
-  id?: string; // vem do banco quando já existe
+  id?: string;
   kickoff_at: string; // datetime-local
   team1: string;
   team2: string;
-  score1: string; // input (permite vazio)
-  score2: string;
+  score1: string; // permite vazio
+  score2: string; // permite vazio
 };
+
+function emptyGames(): GameForm[] {
+  return Array.from({ length: 5 }).map(() => ({
+    kickoff_at: "",
+    team1: "",
+    team2: "",
+    score1: "",
+    score2: "",
+  }));
+}
 
 function isoToDatetimeLocal(iso: string) {
   const d = new Date(iso);
@@ -57,68 +67,111 @@ function toIsoWithLocalTz(datetimeLocal: string) {
   return `${yyyy}-${mm}-${dd}T${hh}:${mi}:${ss}${sign}${offH}:${offM}`;
 }
 
-function emptyGames(): GameForm[] {
-  return Array.from({ length: 5 }).map(() => ({
-    kickoff_at: "",
-    team1: "",
-    team2: "",
-    score1: "",
-    score2: "",
-  }));
+function Pill({
+  kind,
+  children,
+}: {
+  kind: "ok" | "warn" | "info";
+  children: React.ReactNode;
+}) {
+  const cls =
+    kind === "ok"
+      ? "bg-emerald-50 text-emerald-700 ring-emerald-100"
+      : kind === "warn"
+      ? "bg-amber-50 text-amber-800 ring-amber-100"
+      : "bg-blue-50 text-blue-700 ring-blue-100";
+
+  return (
+    <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 ${cls}`}>
+      {children}
+    </span>
+  );
+}
+
+function Notice({
+  kind,
+  text,
+}: {
+  kind: "ok" | "err";
+  text: string;
+}) {
+  const cls =
+    kind === "ok"
+      ? "bg-emerald-50 text-emerald-800 ring-emerald-100"
+      : "bg-rose-50 text-rose-700 ring-rose-100";
+  return <div className={`mt-3 rounded-2xl px-4 py-3 text-sm ring-1 ${cls}`}>{text}</div>;
 }
 
 export default function AdminGamesPage() {
   const [round, setRound] = useState<number>(1);
   const [games, setGames] = useState<GameForm[]>(() => emptyGames());
 
-  const [busySave, setBusySave] = useState(false);
-  const [busyScore, setBusyScore] = useState(false);
+  const [loadingRound, setLoadingRound] = useState(false);
+  const [busySaveGames, setBusySaveGames] = useState(false);
+  const [busySaveScores, setBusySaveScores] = useState(false);
 
   const [msg, setMsg] = useState<string | null>(null);
   const [msgKind, setMsgKind] = useState<"ok" | "err" | null>(null);
+
+  const hasIds = useMemo(() => games.every((g) => !!g.id), [games]);
+
+  const canSaveGames = useMemo(() => {
+    if (!round || round < 1 || round > 38) return false;
+    return games.every(
+      (g) => g.kickoff_at.trim() && g.team1.trim().length >= 2 && g.team2.trim().length >= 2
+    );
+  }, [round, games]);
+
+  const isEmptyRound = useMemo(() => games.every((g) => !g.id), [games]);
 
   function setGame(i: number, patch: Partial<GameForm>) {
     setGames((prev) => prev.map((g, idx) => (idx === i ? { ...g, ...patch } : g)));
   }
 
   async function loadRound(rnd: number) {
+    setLoadingRound(true);
     setMsg(null);
     setMsgKind(null);
 
-    const r = await fetch(
-      `/api/block/by-round?round=${encodeURIComponent(String(rnd))}&ts=${Date.now()}`,
-      { cache: "no-store" }
-    );
-    const j = (await r.json()) as ApiByRoundResp;
-
-    // rodada ainda não cadastrada: limpa a tela
-    if (!j.block) {
-      setRound(rnd);
-      setGames(emptyGames());
-      setMsg(
-        `Rodada ${rnd} ainda não cadastrada. Preencha os 5 jogos e clique "Salvar jogos (estrutura)".`
+    try {
+      const r = await fetch(
+        `/api/block/by-round?round=${encodeURIComponent(String(rnd))}&ts=${Date.now()}`,
+        { cache: "no-store" }
       );
+      const j = (await r.json()) as ApiByRoundResp;
+
+      // rodada ainda não existe: tela vazia “bonita”
+      if (!j.block) {
+        setRound(rnd);
+        setGames(emptyGames());
+        setMsg(`Rodada ${rnd} ainda não cadastrada. Preencha os 5 jogos e salve a estrutura.`);
+        setMsgKind("ok");
+        return;
+      }
+
+      setRound(j.block.round);
+
+      const base = (j.games || []).slice(0, 5);
+      const mapped: GameForm[] = base.map((g) => ({
+        id: g.id,
+        kickoff_at: isoToDatetimeLocal(g.kickoff_at),
+        team1: g.team1 ?? "",
+        team2: g.team2 ?? "",
+        score1: g.score1 === null || g.score1 === undefined ? "" : String(g.score1),
+        score2: g.score2 === null || g.score2 === undefined ? "" : String(g.score2),
+      }));
+
+      while (mapped.length < 5) mapped.push(...emptyGames().slice(0, 5 - mapped.length));
+
+      setGames(mapped);
+      setMsg(`Rodada ${j.block.round} carregada.`);
       setMsgKind("ok");
-      return;
+    } catch {
+      setMsg("Falha ao carregar a rodada (rede/servidor).");
+      setMsgKind("err");
+    } finally {
+      setLoadingRound(false);
     }
-
-    setRound(j.block.round);
-
-    const base = (j.games || []).slice(0, 5);
-    const mapped: GameForm[] = base.map((g) => ({
-      id: g.id,
-      kickoff_at: isoToDatetimeLocal(g.kickoff_at),
-      team1: g.team1 ?? "",
-      team2: g.team2 ?? "",
-      score1: g.score1 === null || g.score1 === undefined ? "" : String(g.score1),
-      score2: g.score2 === null || g.score2 === undefined ? "" : String(g.score2),
-    }));
-
-    while (mapped.length < 5) mapped.push(...emptyGames().slice(0, 5 - mapped.length));
-
-    setGames(mapped);
-    setMsg(`Carregado: rodada ${j.block.round}.`);
-    setMsgKind("ok");
   }
 
   useEffect(() => {
@@ -126,18 +179,8 @@ export default function AdminGamesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const canSaveGames = useMemo(() => {
-    if (!round || round < 1 || round > 38) return false;
-    if (games.length !== 5) return false;
-    return games.every(
-      (g) => g.kickoff_at.trim() && g.team1.trim().length >= 2 && g.team2.trim().length >= 2
-    );
-  }, [round, games]);
-
-  const hasGameIds = useMemo(() => games.every((g) => !!g.id), [games]);
-
   async function saveGamesStructure() {
-    setBusySave(true);
+    setBusySaveGames(true);
     setMsg(null);
     setMsgKind(null);
 
@@ -158,33 +201,31 @@ export default function AdminGamesPage() {
       });
 
       const j = await r.json();
-
       if (!r.ok) {
         setMsg(j?.error ? `Erro: ${j.error}` : "Erro ao salvar jogos");
         setMsgKind("err");
         return;
       }
 
-      setMsg(`✅ Jogos da rodada ${round} salvos.`);
+      setMsg(`✅ Estrutura salva (rodada ${round}).`);
       setMsgKind("ok");
-
       await loadRound(round);
     } catch {
-      setMsg("Erro ao salvar (rede ou servidor).");
+      setMsg("Erro ao salvar (rede/servidor).");
       setMsgKind("err");
     } finally {
-      setBusySave(false);
+      setBusySaveGames(false);
     }
   }
 
   async function saveScoresOnly() {
-    setBusyScore(true);
+    setBusySaveScores(true);
     setMsg(null);
     setMsgKind(null);
 
     try {
-      if (!hasGameIds) {
-        setMsg("Ainda não tenho os IDs dos jogos. Salve os jogos primeiro.");
+      if (!hasIds) {
+        setMsg("Ainda não existem jogos salvos nessa rodada. Salve a estrutura primeiro.");
         setMsgKind("err");
         return;
       }
@@ -194,7 +235,6 @@ export default function AdminGamesPage() {
         scores: games.map((g) => {
           const s1 = g.score1.trim();
           const s2 = g.score2.trim();
-
           const score1 = s1 === "" ? null : Number(s1);
           const score2 = s2 === "" ? null : Number(s2);
 
@@ -213,204 +253,213 @@ export default function AdminGamesPage() {
       });
 
       const j = await r.json();
-
       if (!r.ok) {
         setMsg(j?.error ? `Erro: ${j.error}` : "Erro ao salvar placares");
         setMsgKind("err");
         return;
       }
 
-      setMsg("✅ Placares salvos (campos vazios ficam como null).");
+      setMsg("✅ Placares salvos.");
       setMsgKind("ok");
-
       await loadRound(round);
     } catch {
-      setMsg("Erro ao salvar placares (rede ou servidor).");
+      setMsg("Erro ao salvar placares (rede/servidor).");
       setMsgKind("err");
     } finally {
-      setBusyScore(false);
+      setBusySaveScores(false);
     }
   }
 
   return (
     <main className="min-h-screen bg-slate-50 p-4 sm:p-6">
       <div className="mx-auto max-w-3xl">
+        {/* HEADER */}
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900">Admin — Jogos e placares</h1>
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900">Admin</h1>
             <p className="mt-1 text-sm text-slate-600">
-              Selecione a rodada. Se existir, carrega. Se não existir, abre vazio para cadastrar.
+              Lançamento dos 5 jogos e, depois, dos placares. Troque a rodada e o conteúdo carrega.
             </p>
           </div>
 
           <button
             onClick={() => loadRound(round)}
-            className="rounded-2xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700"
+            disabled={loadingRound}
+            className={[
+              "rounded-2xl px-4 py-2 text-sm font-semibold shadow-sm",
+              loadingRound
+                ? "bg-slate-200 text-slate-500 cursor-not-allowed"
+                : "bg-emerald-600 text-white hover:bg-emerald-700",
+            ].join(" ")}
           >
-            Recarregar
+            {loadingRound ? "Carregando…" : "Recarregar"}
           </button>
         </div>
 
+        {/* TOP CARD */}
         <div className="mt-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
-          <label className="block text-sm font-semibold text-slate-700">Rodada</label>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="text-sm font-semibold text-slate-800">Rodada</div>
+              <div className="mt-2 flex items-center gap-2">
+                <select
+                  value={round}
+                  onChange={(e) => loadRound(Number(e.target.value))}
+                  className="w-44 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                >
+                  {Array.from({ length: 38 }).map((_, i) => {
+                    const rnd = i + 1;
+                    return (
+                      <option key={rnd} value={rnd}>
+                        Rodada {rnd}
+                      </option>
+                    );
+                  })}
+                </select>
 
-          <div className="mt-2 flex items-center gap-2">
-            <select
-              value={round}
-              onChange={(e) => {
-                const rnd = Number(e.target.value);
-                if (!rnd) return;
-                loadRound(rnd);
-              }}
-              className="w-44 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600"
-            >
-              {Array.from({ length: 38 }).map((_, i) => {
-                const rnd = i + 1;
-                return (
-                  <option key={rnd} value={rnd}>
-                    Rodada {rnd}
-                  </option>
-                );
-              })}
-            </select>
+                {isEmptyRound ? <Pill kind="warn">não cadastrada</Pill> : <Pill kind="ok">carregada</Pill>}
+              </div>
+            </div>
 
-            <span className="text-xs text-slate-500">1 a 38</span>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <button
+                onClick={saveGamesStructure}
+                disabled={!canSaveGames || busySaveGames}
+                className={[
+                  "rounded-2xl px-4 py-2 text-sm font-semibold shadow-sm",
+                  canSaveGames && !busySaveGames
+                    ? "bg-emerald-600 text-white hover:bg-emerald-700"
+                    : "bg-slate-200 text-slate-500 cursor-not-allowed",
+                ].join(" ")}
+              >
+                {busySaveGames ? "Salvando…" : "Salvar jogos"}
+              </button>
+
+              <button
+                onClick={saveScoresOnly}
+                disabled={!hasIds || busySaveScores}
+                className={[
+                  "rounded-2xl px-4 py-2 text-sm font-semibold shadow-sm",
+                  hasIds && !busySaveScores
+                    ? "bg-blue-700 text-white hover:bg-blue-800"
+                    : "bg-slate-200 text-slate-500 cursor-not-allowed",
+                ].join(" ")}
+              >
+                {busySaveScores ? "Salvando…" : "Salvar placares"}
+              </button>
+            </div>
           </div>
 
-          {msg && (
-            <div
-              className={[
-                "mt-3 rounded-xl px-3 py-2 text-sm ring-1",
-                msgKind === "ok"
-                  ? "bg-emerald-50 text-emerald-800 ring-emerald-100"
-                  : "bg-rose-50 text-rose-700 ring-rose-100",
-              ].join(" ")}
-            >
-              {msg}
-            </div>
-          )}
+          {msg && msgKind && <Notice kind={msgKind} text={msg} />}
 
-          <div className="mt-6 space-y-4">
-            {games.map((g, i) => (
-              <div key={i} className="rounded-2xl border border-slate-200 bg-white p-4">
-                <div className="flex items-center justify-between">
+          <div className="mt-3 text-xs text-slate-500">
+            <span className="font-semibold">Salvar jogos</span> cria/atualiza kickoff e times.{" "}
+            <span className="font-semibold">Salvar placares</span> só atualiza <code>score1/score2</code> (não apaga nada).
+          </div>
+        </div>
+
+        {/* GAMES */}
+        <div className="mt-4 space-y-3">
+          {games.map((g, i) => (
+            <div key={i} className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+              <div className="flex items-start justify-between gap-3">
+                <div>
                   <div className="text-sm font-semibold text-slate-900">Jogo {i + 1}</div>
-                  {g.id ? (
-                    <span className="rounded-full bg-blue-50 px-2 py-1 text-[11px] font-semibold text-blue-700 ring-1 ring-blue-100">
-                      ID OK
-                    </span>
-                  ) : (
-                    <span className="rounded-full bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-800 ring-1 ring-amber-100">
-                      sem ID
-                    </span>
-                  )}
-                </div>
-
-                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
-                  <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wide text-slate-600">
-                      Data/Hora
-                    </label>
-                    <input
-                      type="datetime-local"
-                      value={g.kickoff_at}
-                      onChange={(e) => setGame(i, { kickoff_at: e.target.value })}
-                      className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wide text-slate-600">
-                      Mandante
-                    </label>
-                    <input
-                      value={g.team1}
-                      onChange={(e) => setGame(i, { team1: e.target.value })}
-                      placeholder="Ex.: Palmeiras"
-                      className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wide text-slate-600">
-                      Visitante
-                    </label>
-                    <input
-                      value={g.team2}
-                      onChange={(e) => setGame(i, { team2: e.target.value })}
-                      placeholder="Ex.: Corinthians"
-                      className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600"
-                    />
+                  <div className="mt-1 text-xs text-slate-500">
+                    {g.id ? (
+                      <span className="inline-flex items-center gap-2">
+                        <Pill kind="info">id ok</Pill>
+                        <span className="truncate max-w-[220px] sm:max-w-[420px]">{g.id}</span>
+                      </span>
+                    ) : (
+                      <Pill kind="warn">sem id (ainda não salvo)</Pill>
+                    )}
                   </div>
                 </div>
 
-                <div className="mt-4 grid grid-cols-2 gap-3 sm:max-w-xs">
-                  <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wide text-slate-600">
-                      Placar mandante
-                    </label>
-                    <input
-                      inputMode="numeric"
-                      value={g.score1}
-                      onChange={(e) => setGame(i, { score1: e.target.value })}
-                      placeholder="(vazio = null)"
-                      className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600"
-                    />
-                  </div>
+                <div className="flex items-center gap-2">
+                  <Pill kind="ok">verde</Pill>
+                  <Pill kind="info">azul</Pill>
+                  <Pill kind="warn">amarelo</Pill>
+                </div>
+              </div>
 
-                  <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wide text-slate-600">
-                      Placar visitante
-                    </label>
-                    <input
-                      inputMode="numeric"
-                      value={g.score2}
-                      onChange={(e) => setGame(i, { score2: e.target.value })}
-                      placeholder="(vazio = null)"
-                      className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600"
-                    />
+              {/* TIMES */}
+              <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wide text-slate-600">
+                    Data/Hora
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={g.kickoff_at}
+                    onChange={(e) => setGame(i, { kickoff_at: e.target.value })}
+                    className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wide text-slate-600">
+                    Mandante
+                  </label>
+                  <input
+                    value={g.team1}
+                    onChange={(e) => setGame(i, { team1: e.target.value })}
+                    placeholder="Ex.: Palmeiras"
+                    className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wide text-slate-600">
+                    Visitante
+                  </label>
+                  <input
+                    value={g.team2}
+                    onChange={(e) => setGame(i, { team2: e.target.value })}
+                    placeholder="Ex.: Corinthians"
+                    className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                  />
+                </div>
+              </div>
+
+              {/* SCORE (bonito, compacto) */}
+              <div className="mt-4">
+                <label className="block text-xs font-semibold uppercase tracking-wide text-slate-600">
+                  Placar (opcional)
+                </label>
+
+                <div className="mt-2 inline-flex items-stretch overflow-hidden rounded-xl border border-slate-300 bg-white">
+                  <input
+                    inputMode="numeric"
+                    value={g.score1}
+                    onChange={(e) => setGame(i, { score1: e.target.value })}
+                    placeholder="—"
+                    className="w-16 px-3 py-2 text-center text-sm font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                  />
+                  <div className="flex items-center justify-center px-3 text-sm font-semibold text-slate-400">
+                    x
                   </div>
+                  <input
+                    inputMode="numeric"
+                    value={g.score2}
+                    onChange={(e) => setGame(i, { score2: e.target.value })}
+                    placeholder="—"
+                    className="w-16 px-3 py-2 text-center text-sm font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                  />
                 </div>
 
                 <div className="mt-2 text-xs text-slate-500">
-                  Dica: você pode preencher placares aos poucos. Campos vazios ficam como <span className="font-semibold">null</span>.
+                  Deixe vazio para <span className="font-semibold">null</span>. Salve placares quando quiser (mesmo parcial).
                 </div>
               </div>
-            ))}
-          </div>
+            </div>
+          ))}
+        </div>
 
-          <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <button
-              onClick={saveGamesStructure}
-              disabled={!canSaveGames || busySave}
-              className={[
-                "rounded-2xl px-4 py-2 text-sm font-semibold shadow-sm",
-                canSaveGames && !busySave
-                  ? "bg-emerald-600 text-white hover:bg-emerald-700"
-                  : "bg-slate-200 text-slate-500 cursor-not-allowed",
-              ].join(" ")}
-            >
-              {busySave ? "Salvando…" : "Salvar jogos (estrutura)"}
-            </button>
-
-            <button
-              onClick={saveScoresOnly}
-              disabled={!hasGameIds || busyScore}
-              className={[
-                "rounded-2xl px-4 py-2 text-sm font-semibold shadow-sm",
-                hasGameIds && !busyScore
-                  ? "bg-blue-700 text-white hover:bg-blue-800"
-                  : "bg-slate-200 text-slate-500 cursor-not-allowed",
-              ].join(" ")}
-            >
-              {busyScore ? "Salvando…" : "Salvar placares"}
-            </button>
-          </div>
-
-          <div className="mt-4 text-xs text-slate-500">
-            <span className="font-semibold">Importante:</span> “Salvar placares” só dá UPDATE em{" "}
-            <code>games.score1/score2</code>. Não apaga nem recria jogos.
-          </div>
+        {/* FOOTER HELP */}
+        <div className="mt-6 text-xs text-slate-500">
+          Dica: para cadastrar a rodada 2, selecione <span className="font-semibold">Rodada 2</span>. Se não existir, a tela abre vazia.
         </div>
       </div>
     </main>
