@@ -1,22 +1,54 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+
+type Player = { id: string; name: string };
 
 export default function LoginClient({ nextPath }: { nextPath: string }) {
   const router = useRouter();
 
+  const [players, setPlayers] = useState<Player[]>([]);
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
+
   const [msg, setMsg] = useState<string | null>(null);
   const [msgKind, setMsgKind] = useState<"ok" | "err" | null>(null);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const r = await fetch("/api/players/active", { cache: "no-store" });
+        const j = await r.json();
+        if (r.ok && j?.ok) {
+          setPlayers(j.players || []);
+        }
+      } catch {
+        // silencioso
+      }
+    })();
+  }, []);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     setMsg(null);
     setMsgKind(null);
+
+    if (!name) {
+      setMsg("Selecione seu nome.");
+      setMsgKind("err");
+      setLoading(false);
+      return;
+    }
+
+    if (!password || password.trim().length < 3) {
+      setMsg("Informe uma senha (mínimo 3 caracteres).");
+      setMsgKind("err");
+      setLoading(false);
+      return;
+    }
 
     try {
       const r = await fetch("/api/auth/login", {
@@ -64,19 +96,37 @@ export default function LoginClient({ nextPath }: { nextPath: string }) {
           onSubmit={onSubmit}
           className="mt-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200"
         >
-          <label className="block text-sm font-semibold text-slate-800">Nome</label>
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600"
-            placeholder="Ex: Tiago"
-            autoComplete="username"
-          />
+          <label className="block text-sm font-semibold text-slate-800">
+            Nome
+          </label>
 
-          <label className="mt-4 block text-sm font-semibold text-slate-800">Senha</label>
+          <select
+            value={name}
+            onChange={(e) => {
+              setName(e.target.value);
+              setMsg(null);
+              setMsgKind(null);
+            }}
+            className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600"
+          >
+            <option value="">Selecione…</option>
+            {players.map((p) => (
+              <option key={p.id} value={p.name}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+
+          <label className="mt-4 block text-sm font-semibold text-slate-800">
+            Senha
+          </label>
           <input
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={(e) => {
+              setPassword(e.target.value);
+              setMsg(null);
+              setMsgKind(null);
+            }}
             type="password"
             className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600"
             placeholder="••••••••"
@@ -109,7 +159,7 @@ export default function LoginClient({ nextPath }: { nextPath: string }) {
           </button>
 
           <div className="mt-3 text-xs text-slate-500">
-            Dica: use exatamente o nome cadastrado (ex.: “Tiago”, “Duda”, “Fábio”).
+            Se for seu primeiro acesso, essa senha será registrada no sistema.
           </div>
         </form>
       </div>
