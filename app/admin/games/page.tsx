@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-type ApiBlock = {
+type ApiByRoundResp = {
   block: { id: string; round: number; kickoffMin: string | null } | null;
   players: { id: string; name: string }[];
   games: {
@@ -22,12 +22,11 @@ type GameForm = {
   kickoff_at: string; // datetime-local
   team1: string;
   team2: string;
-  score1: string; // input text/number (permite vazio)
+  score1: string; // input (permite vazio)
   score2: string;
 };
 
 function isoToDatetimeLocal(iso: string) {
-  // ISO -> "YYYY-MM-DDTHH:mm" no fuso do navegador
   const d = new Date(iso);
   const pad = (n: number) => String(n).padStart(2, "0");
   const yyyy = d.getFullYear();
@@ -39,8 +38,6 @@ function isoToDatetimeLocal(iso: string) {
 }
 
 function toIsoWithLocalTz(datetimeLocal: string) {
-  // datetimeLocal: "2026-01-24T00:00"
-  // ISO com timezone local do browser: "2026-01-24T00:00:00-03:00"
   const d = new Date(datetimeLocal);
   const pad = (n: number) => String(n).padStart(2, "0");
 
@@ -60,20 +57,23 @@ function toIsoWithLocalTz(datetimeLocal: string) {
   return `${yyyy}-${mm}-${dd}T${hh}:${mi}:${ss}${sign}${offH}:${offM}`;
 }
 
+function emptyGames(): GameForm[] {
+  return Array.from({ length: 5 }).map(() => ({
+    kickoff_at: "",
+    team1: "",
+    team2: "",
+    score1: "",
+    score2: "",
+  }));
+}
+
 export default function AdminGamesPage() {
   const [round, setRound] = useState<number>(1);
-  const [games, setGames] = useState<GameForm[]>(() =>
-    Array.from({ length: 5 }).map(() => ({
-      kickoff_at: "",
-      team1: "",
-      team2: "",
-      score1: "",
-      score2: "",
-    }))
-  );
+  const [games, setGames] = useState<GameForm[]>(() => emptyGames());
 
   const [busySave, setBusySave] = useState(false);
   const [busyScore, setBusyScore] = useState(false);
+
   const [msg, setMsg] = useState<string | null>(null);
   const [msgKind, setMsgKind] = useState<"ok" | "err" | null>(null);
 
@@ -81,23 +81,29 @@ export default function AdminGamesPage() {
     setGames((prev) => prev.map((g, idx) => (idx === i ? { ...g, ...patch } : g)));
   }
 
-  async function loadCurrent() {
+  async function loadRound(rnd: number) {
     setMsg(null);
     setMsgKind(null);
 
-    const r = await fetch("/api/block/current?ts=" + Date.now(), { cache: "no-store" });
-    const j = (await r.json()) as ApiBlock;
+    const r = await fetch(
+      `/api/block/by-round?round=${encodeURIComponent(String(rnd))}&ts=${Date.now()}`,
+      { cache: "no-store" }
+    );
+    const j = (await r.json()) as ApiByRoundResp;
 
-    if (!j.block || !j.games?.length) {
-      // mantém estado atual, só informa
-      setMsg("Nenhum bloco/jogo encontrado. Lance os jogos primeiro.");
-      setMsgKind("err");
+    // rodada ainda não cadastrada: limpa a tela
+    if (!j.block) {
+      setRound(rnd);
+      setGames(emptyGames());
+      setMsg(
+        `Rodada ${rnd} ainda não cadastrada. Preencha os 5 jogos e clique "Salvar jogos (estrutura)".`
+      );
+      setMsgKind("ok");
       return;
     }
 
     setRound(j.block.round);
 
-    // Preenche 5 jogos (se tiver menos, completa; se tiver mais, pega os 5 primeiros)
     const base = (j.games || []).slice(0, 5);
     const mapped: GameForm[] = base.map((g) => ({
       id: g.id,
@@ -108,17 +114,15 @@ export default function AdminGamesPage() {
       score2: g.score2 === null || g.score2 === undefined ? "" : String(g.score2),
     }));
 
-    while (mapped.length < 5) {
-      mapped.push({ kickoff_at: "", team1: "", team2: "", score1: "", score2: "" });
-    }
+    while (mapped.length < 5) mapped.push(...emptyGames().slice(0, 5 - mapped.length));
 
     setGames(mapped);
-    setMsg(`Carregado bloco atual: rodada ${j.block.round}.`);
+    setMsg(`Carregado: rodada ${j.block.round}.`);
     setMsgKind("ok");
   }
 
   useEffect(() => {
-    loadCurrent();
+    loadRound(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -164,8 +168,7 @@ export default function AdminGamesPage() {
       setMsg(`✅ Jogos da rodada ${round} salvos.`);
       setMsgKind("ok");
 
-      // Recarrega para capturar IDs (e também conferir se está tudo certo no banco)
-      await loadCurrent();
+      await loadRound(round);
     } catch {
       setMsg("Erro ao salvar (rede ou servidor).");
       setMsgKind("err");
@@ -181,7 +184,7 @@ export default function AdminGamesPage() {
 
     try {
       if (!hasGameIds) {
-        setMsg("Ainda não tenho os IDs dos jogos. Salve os jogos primeiro e recarregue.");
+        setMsg("Ainda não tenho os IDs dos jogos. Salve os jogos primeiro.");
         setMsgKind("err");
         return;
       }
@@ -192,7 +195,6 @@ export default function AdminGamesPage() {
           const s1 = g.score1.trim();
           const s2 = g.score2.trim();
 
-          // vazio => null (placar parcial permitido)
           const score1 = s1 === "" ? null : Number(s1);
           const score2 = s2 === "" ? null : Number(s2);
 
@@ -221,7 +223,7 @@ export default function AdminGamesPage() {
       setMsg("✅ Placares salvos (campos vazios ficam como null).");
       setMsgKind("ok");
 
-      await loadCurrent();
+      await loadRound(round);
     } catch {
       setMsg("Erro ao salvar placares (rede ou servidor).");
       setMsgKind("err");
@@ -237,12 +239,12 @@ export default function AdminGamesPage() {
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-slate-900">Admin — Jogos e placares</h1>
             <p className="mt-1 text-sm text-slate-600">
-              Use esta tela para lançar os 5 jogos da rodada e, depois, preencher os placares (score1/score2).
+              Selecione a rodada. Se existir, carrega. Se não existir, abre vazio para cadastrar.
             </p>
           </div>
 
           <button
-            onClick={loadCurrent}
+            onClick={() => loadRound(round)}
             className="rounded-2xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700"
           >
             Recarregar
@@ -251,15 +253,27 @@ export default function AdminGamesPage() {
 
         <div className="mt-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
           <label className="block text-sm font-semibold text-slate-700">Rodada</label>
+
           <div className="mt-2 flex items-center gap-2">
-            <input
-              type="number"
-              min={1}
-              max={38}
+            <select
               value={round}
-              onChange={(e) => setRound(parseInt(e.target.value || "1", 10))}
-              className="w-28 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600"
-            />
+              onChange={(e) => {
+                const rnd = Number(e.target.value);
+                if (!rnd) return;
+                loadRound(rnd);
+              }}
+              className="w-44 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600"
+            >
+              {Array.from({ length: 38 }).map((_, i) => {
+                const rnd = i + 1;
+                return (
+                  <option key={rnd} value={rnd}>
+                    Rodada {rnd}
+                  </option>
+                );
+              })}
+            </select>
+
             <span className="text-xs text-slate-500">1 a 38</span>
           </div>
 
@@ -394,8 +408,8 @@ export default function AdminGamesPage() {
           </div>
 
           <div className="mt-4 text-xs text-slate-500">
-            <span className="font-semibold">Importante:</span> “Salvar placares” só dá UPDATE em <code>games.score1/score2</code>.
-            Não apaga nem recria jogos.
+            <span className="font-semibold">Importante:</span> “Salvar placares” só dá UPDATE em{" "}
+            <code>games.score1/score2</code>. Não apaga nem recria jogos.
           </div>
         </div>
       </div>
