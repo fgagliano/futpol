@@ -1,16 +1,13 @@
-
 import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { decryptChoice } from "@/lib/crypto";
+
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 type Choice = "TEAM1" | "DRAW" | "TEAM2";
 
 export async function GET() {
-  // bloco atual = maior rodada
-  import { NextResponse } from "next/server";
-
   const [block] = await sql`
     select id, round
     from public.blocks
@@ -19,13 +16,15 @@ export async function GET() {
   `;
 
   if (!block) {
-    return NextResponse.json({
+    const res = NextResponse.json({
       block: null,
       players: [],
       games: [],
       isRevealed: false,
       grid: [],
     });
+    res.headers.set("Cache-Control", "no-store, max-age=0");
+    return res;
   }
 
   const players = await sql`
@@ -52,13 +51,14 @@ export async function GET() {
   const now = new Date();
   const isRevealed = kickoffMin ? now >= new Date(kickoffMin) : false;
 
-  const picks = games.length
-    ? await sql`
-        select game_id, player_id, encrypted_choice
-        from public.picks
-        where game_id = any(${games.map((g: any) => g.id)})
-      `
-    : [];
+  const picks =
+    games.length > 0
+      ? await sql`
+          select game_id, player_id, encrypted_choice
+          from public.picks
+          where game_id = any(${games.map((g: any) => g.id)})
+        `
+      : [];
 
   const pickMap = new Map<string, string>();
   for (const p of picks as any[]) {
@@ -80,21 +80,19 @@ export async function GET() {
       }
 
       const text =
-        choice === "TEAM1"
-          ? g.team1
-          : choice === "TEAM2"
-          ? g.team2
-          : "Empate";
+        choice === "TEAM1" ? g.team1 : choice === "TEAM2" ? g.team2 : "Empate";
 
       return { status: "REVEALED", text };
     })
   );
 
-  return NextResponse.json({
+  const res = NextResponse.json({
     block: { id: block.id, round: block.round, kickoffMin },
     players,
     games,
     isRevealed,
     grid,
   });
+  res.headers.set("Cache-Control", "no-store, max-age=0");
+  return res;
 }
