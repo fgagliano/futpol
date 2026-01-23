@@ -41,6 +41,18 @@ function Dot({ kind }: { kind: "red" | "green" }) {
   );
 }
 
+function Badge({ revealed }: { revealed: boolean }) {
+  return revealed ? (
+    <span className="rounded-full bg-blue-50 px-2 py-1 text-[11px] font-semibold text-blue-700 ring-1 ring-blue-100">
+      REVELADO
+    </span>
+  ) : (
+    <span className="rounded-full bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700 ring-1 ring-emerald-100">
+      ABERTO
+    </span>
+  );
+}
+
 export default function HomePage() {
   const [data, setData] = useState<ApiResp | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -87,7 +99,7 @@ export default function HomePage() {
 
           <button
             onClick={load}
-            className="rounded-2xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800"
+            className="rounded-2xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700"
           >
             Atualizar
           </button>
@@ -110,7 +122,7 @@ export default function HomePage() {
                   {/* ===== MOBILE: cards (default) ===== */}
                   <div className="space-y-3 sm:hidden">
                     {data.games.map((g, rowIdx) => (
-                      <div key={g.id} className="rounded-2xl border border-slate-200 p-4">
+                      <div key={g.id} className="rounded-2xl border border-slate-200 bg-white p-4">
                         <div className="flex items-start justify-between gap-3">
                           <div>
                             <div className="text-sm font-semibold text-slate-900">
@@ -119,22 +131,19 @@ export default function HomePage() {
                             <div className="mt-1 text-xs text-slate-500">{fmtKickoff(g.kickoff_at)}</div>
                           </div>
 
-                          <div className="text-[11px] font-semibold text-slate-700">
-                            {data.isRevealed ? (
-                              <span className="rounded-full bg-slate-100 px-2 py-1">REVELADO</span>
-                            ) : (
-                              <span className="rounded-full bg-slate-100 px-2 py-1">ABERTO</span>
-                            )}
-                          </div>
+                          <Badge revealed={data.isRevealed} />
                         </div>
 
-                        <div className="mt-3 divide-y divide-slate-100 rounded-xl border border-slate-100">
+                        <div className="mt-3 overflow-hidden rounded-xl border border-slate-100">
                           {data.players.map((p, colIdx) => {
                             const cell = data.grid?.[rowIdx]?.[colIdx];
                             const status = cell?.status ?? "MISSING";
 
                             return (
-                              <div key={p.id} className="flex items-center justify-between px-3 py-2">
+                              <div
+                                key={p.id}
+                                className="flex items-center justify-between px-3 py-2 odd:bg-white even:bg-slate-50"
+                              >
                                 <div className="text-sm font-medium text-slate-800">{p.name}</div>
 
                                 {!data.isRevealed ? (
@@ -150,6 +159,13 @@ export default function HomePage() {
                             );
                           })}
                         </div>
+
+                        {/* pequena dica visual (amarelo) */}
+                        {!data.isRevealed && (
+                          <div className="mt-3 text-xs text-amber-700">
+                            Dica: quando virar “REVELADO”, os palpites aparecem aqui.
+                          </div>
+                        )}
                       </div>
                     ))}
 
@@ -187,7 +203,7 @@ export default function HomePage() {
 
                         <tbody>
                           {data.games.map((g, rowIdx) => (
-                            <tr key={g.id}>
+                            <tr key={g.id} className={rowIdx % 2 === 0 ? "bg-white" : "bg-slate-50"}>
                               <td className="sticky left-0 z-10 bg-white px-3 py-3 text-sm text-slate-900 ring-1 ring-slate-200">
                                 <div className="font-semibold">
                                   {g.team1} <span className="text-slate-400">x</span> {g.team2}
