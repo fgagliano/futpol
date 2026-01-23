@@ -259,8 +259,9 @@ export default function ResultadosPage() {
                   const acum = overallMap.get(pl.id) ?? 0;
 
                   return (
-                    <React.Fragment key={pl.id}>
-                      {/* linha Palpite */}
+<Fragment key={pl.id}>
+
+                    {/* linha Palpite */}
                       <tr className="bg-white">
                         <td className="sticky left-0 z-10 bg-white px-4 py-3 ring-1 ring-slate-200">
                           <div className="text-sm font-bold text-slate-900">{pl.name}</div>
