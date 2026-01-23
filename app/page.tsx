@@ -87,7 +87,36 @@ export default function HomePage() {
   const hasGames = (data?.games?.length || 0) > 0;
 
   return (
-    <main className="min-h-screen bg-slate-50 p-4 sm:p-6">
+    <main className="min-h-screen bg-slate-50 p-4 sm:p-6
+            {/* AÇÕES PRINCIPAIS (TOPO) */}
+      <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <a
+          href="/palpitar"
+          className="group rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200 hover:ring-emerald-200 hover:bg-emerald-50 transition"
+        >
+          <div className="text-sm font-semibold text-slate-700">1</div>
+          <div className="mt-1 text-lg font-extrabold text-slate-900 group-hover:text-emerald-800">
+            Dê seus Palpites
+          </div>
+          <div className="mt-1 text-sm text-slate-600">
+            Escolha 1 / X / 2 para os 5 jogos da rodada.
+          </div>
+        </a>
+
+        <a
+          href="/resultados"
+          className="group rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200 hover:ring-blue-200 hover:bg-blue-50 transition"
+        >
+          <div className="text-sm font-semibold text-slate-700">2</div>
+          <div className="mt-1 text-lg font-extrabold text-slate-900 group-hover:text-blue-800">
+            Confira o Extrato da Rodada
+          </div>
+          <div className="mt-1 text-sm text-slate-600">
+            Veja gabarito, palpites e pontos do grupo.
+          </div>
+        </a>
+      </div>
+
       <div className="mx-auto max-w-6xl">
         <div className="flex items-start justify-between gap-4">
           <div>
