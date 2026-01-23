@@ -122,12 +122,7 @@ export default function HomePage() {
             </p>
           </div>
 
-          <button
-            onClick={load}
-            className="rounded-2xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700"
-          >
-            Atualizar
-          </button>
+          
         </div>
 
         <div className="mt-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
