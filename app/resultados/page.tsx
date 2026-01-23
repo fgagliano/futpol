@@ -330,7 +330,8 @@ export default function ResultadosPage() {
                           —
                         </td>
                       </tr>
-                    </React.Fragment>
+                    </Fragment>
+
                   );
                 })}
               </tbody>
