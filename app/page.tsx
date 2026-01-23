@@ -80,7 +80,7 @@ export default function HomePage() {
 
   const title = useMemo(() => {
     if (!data?.block) return "FutPol";
-    return `FutPol — Rodada ${data.block.round}`;
+    return `Futebol & Política — Rodada ${data.block.round}`;
   }, [data?.block]);
 
   const hasBlock = !!data?.block;
