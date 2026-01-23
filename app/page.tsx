@@ -160,14 +160,7 @@ export default function HomePage() {
                           })}
                         </div>
 
-                        {/* pequena dica visual (amarelo) */}
-                        {!data.isRevealed && (
-                          <div className="mt-3 text-xs text-amber-700">
-                            Dica: quando virar “REVELADO”, os palpites aparecem aqui.
-                          </div>
-                        )}
-                      </div>
-                    ))}
+         
 
                     <div className="pt-1 text-xs text-slate-500">
                       <span className="font-semibold">Status:</span>{" "}
