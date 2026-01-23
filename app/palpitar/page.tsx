@@ -22,6 +22,18 @@ function fmt(iso: string) {
   });
 }
 
+function Badge({ revealed }: { revealed: boolean }) {
+  return revealed ? (
+    <span className="rounded-full bg-blue-50 px-2 py-1 text-[11px] font-semibold text-blue-700 ring-1 ring-blue-100">
+      REVELADO
+    </span>
+  ) : (
+    <span className="rounded-full bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700 ring-1 ring-emerald-100">
+      ABERTO
+    </span>
+  );
+}
+
 export default function PalpitarPage() {
   const [data, setData] = useState<ApiResp | null>(null);
 
@@ -29,6 +41,8 @@ export default function PalpitarPage() {
   const [saved, setSaved] = useState<Record<string, Choice>>({});
 
   const [msg, setMsg] = useState<string | null>(null);
+  const [msgKind, setMsgKind] = useState<"ok" | "err" | null>(null);
+
   const [busyKey, setBusyKey] = useState<string | null>(null);
 
   async function load() {
@@ -55,16 +69,19 @@ export default function PalpitarPage() {
   async function sendPick(gameId: string, choice: Choice) {
     if (!playerId) {
       setMsg("Escolha o jogador primeiro.");
+      setMsgKind("err");
       return;
     }
 
-    // opcional: trava edição quando já revelou
     if (data?.isRevealed) {
-      setMsg("Palpites já revelados/travados para este bloco.");
+      setMsg("Palpites travados (kickoff do bloco já iniciou).");
+      setMsgKind("err");
       return;
     }
 
     setMsg(null);
+    setMsgKind(null);
+
     const key = `${gameId}:${choice}`;
     setBusyKey(key);
 
@@ -78,14 +95,14 @@ export default function PalpitarPage() {
       const j = await r.json();
       if (!r.ok) {
         setMsg(j?.error || "Erro ao enviar palpite");
+        setMsgKind("err");
         return;
       }
 
-      // UI imediata: marca como salvo
       setSaved((prev) => ({ ...prev, [gameId]: choice }));
       setMsg("✅ Palpite salvo.");
+      setMsgKind("ok");
 
-      // recarrega estado geral (jogos/players/isRevealed)
       await load();
     } finally {
       setBusyKey(null);
@@ -107,9 +124,13 @@ export default function PalpitarPage() {
         </div>
 
         <div className="mt-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
-          <label className="block text-sm font-semibold text-slate-700">
-            Jogador
-          </label>
+          <div className="flex items-center justify-between gap-3">
+            <label className="block text-sm font-semibold text-slate-700">
+              Jogador
+            </label>
+
+            {data?.block && <Badge revealed={!!data.isRevealed} />}
+          </div>
 
           <select
             value={playerId}
@@ -117,11 +138,12 @@ export default function PalpitarPage() {
               const id = e.target.value;
               setPlayerId(id);
               setMsg(null);
+              setMsgKind(null);
               setSaved({});
               if (!id) return;
               await loadSaved(id);
             }}
-            className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900"
+            className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600"
           >
             <option value="">Selecione…</option>
             {data?.players?.map((p) => (
@@ -141,7 +163,18 @@ export default function PalpitarPage() {
             </div>
           )}
 
-          {msg && <div className="mt-3 text-sm text-slate-700">{msg}</div>}
+          {msg && (
+            <div
+              className={[
+                "mt-3 rounded-xl px-3 py-2 text-sm ring-1",
+                msgKind === "ok"
+                  ? "bg-emerald-50 text-emerald-800 ring-emerald-100"
+                  : "bg-rose-50 text-rose-700 ring-rose-100",
+              ].join(" ")}
+            >
+              {msg}
+            </div>
+          )}
         </div>
 
         <div className="mt-4 space-y-3">
@@ -164,7 +197,7 @@ export default function PalpitarPage() {
                     </div>
 
                     {current ? (
-                      <div className="mt-1 text-xs font-semibold text-green-600">
+                      <div className="mt-1 text-xs font-semibold text-emerald-700">
                         ✅ Salvo
                       </div>
                     ) : (
@@ -176,49 +209,55 @@ export default function PalpitarPage() {
                 <div className="mt-3 grid grid-cols-3 gap-2">
                   <button
                     onClick={() => sendPick(g.id, "TEAM1")}
-                    disabled={busyKey !== null}
+                    disabled={busyKey !== null || !!data?.isRevealed}
                     className={[
-                      "rounded-xl px-3 py-2 text-sm font-semibold border",
+                      "rounded-xl px-3 py-2 text-sm font-semibold border transition active:scale-[0.99]",
                       current === "TEAM1"
-                        ? "bg-slate-900 text-white border-slate-900"
+                        ? "bg-emerald-600 text-white border-emerald-600"
                         : "bg-white text-slate-900 border-slate-300 hover:bg-slate-50",
-                      data?.isRevealed ? "opacity-60 cursor-not-allowed" : "",
+                      (busyKey !== null || !!data?.isRevealed)
+                        ? "opacity-70 cursor-not-allowed"
+                        : "",
                     ].join(" ")}
                   >
-                    {busyKey === `${g.id}:TEAM1` ? "Enviando…" : g.team1}
+                    {busyKey === `${g.id}:TEAM1` ? "Salvando…" : g.team1}
                   </button>
 
                   <button
                     onClick={() => sendPick(g.id, "DRAW")}
-                    disabled={busyKey !== null}
+                    disabled={busyKey !== null || !!data?.isRevealed}
                     className={[
-                      "rounded-xl px-3 py-2 text-sm font-semibold border",
+                      "rounded-xl px-3 py-2 text-sm font-semibold border transition active:scale-[0.99]",
                       current === "DRAW"
-                        ? "bg-slate-900 text-white border-slate-900"
+                        ? "bg-emerald-600 text-white border-emerald-600"
                         : "bg-white text-slate-900 border-slate-300 hover:bg-slate-50",
-                      data?.isRevealed ? "opacity-60 cursor-not-allowed" : "",
+                      (busyKey !== null || !!data?.isRevealed)
+                        ? "opacity-70 cursor-not-allowed"
+                        : "",
                     ].join(" ")}
                   >
-                    {busyKey === `${g.id}:DRAW` ? "Enviando…" : "Empate"}
+                    {busyKey === `${g.id}:DRAW` ? "Salvando…" : "Empate"}
                   </button>
 
                   <button
                     onClick={() => sendPick(g.id, "TEAM2")}
-                    disabled={busyKey !== null}
+                    disabled={busyKey !== null || !!data?.isRevealed}
                     className={[
-                      "rounded-xl px-3 py-2 text-sm font-semibold border",
+                      "rounded-xl px-3 py-2 text-sm font-semibold border transition active:scale-[0.99]",
                       current === "TEAM2"
-                        ? "bg-slate-900 text-white border-slate-900"
+                        ? "bg-emerald-600 text-white border-emerald-600"
                         : "bg-white text-slate-900 border-slate-300 hover:bg-slate-50",
-                      data?.isRevealed ? "opacity-60 cursor-not-allowed" : "",
+                      (busyKey !== null || !!data?.isRevealed)
+                        ? "opacity-70 cursor-not-allowed"
+                        : "",
                     ].join(" ")}
                   >
-                    {busyKey === `${g.id}:TEAM2` ? "Enviando…" : g.team2}
+                    {busyKey === `${g.id}:TEAM2` ? "Salvando…" : g.team2}
                   </button>
                 </div>
 
                 {data?.isRevealed && (
-                  <div className="mt-3 text-xs text-amber-600">
+                  <div className="mt-3 text-xs text-amber-700">
                     Palpites travados (kickoff do bloco já iniciou).
                   </div>
                 )}
