@@ -3,6 +3,7 @@ import { sql } from "@/lib/db";
 import { decryptChoice } from "@/lib/crypto";
 
 type Choice = "TEAM1" | "DRAW" | "TEAM2";
+type OneXTwo = "1" | "X" | "2";
 
 function resultFromScore(score1: number, score2: number): Choice {
   if (score1 > score2) return "TEAM1";
@@ -10,9 +11,9 @@ function resultFromScore(score1: number, score2: number): Choice {
   return "DRAW";
 }
 
-function resultTo1X2(real: Choice): "1" | "X" | "2" {
-  if (real === "TEAM1") return "1";
-  if (real === "TEAM2") return "2";
+function to1X2(c: Choice): OneXTwo {
+  if (c === "TEAM1") return "1";
+  if (c === "TEAM2") return "2";
   return "X";
 }
 
@@ -22,7 +23,7 @@ function pointsForPick(real: Choice, pick: Choice): number {
   // empate nunca dá negativo
   if (real === "DRAW") return 0;
 
-  // oposto dá -1 (TEAM1 <-> TEAM2)
+  // oposto (1<->2) dá -1
   const isOpposite =
     (real === "TEAM1" && pick === "TEAM2") || (real === "TEAM2" && pick === "TEAM1");
 
@@ -65,8 +66,8 @@ export async function GET(req: Request) {
     order by kickoff_at asc, team1 asc, team2 asc
   `) as any[];
 
-  // picks dessa rodada
-  const picks = games.length
+  // picks da rodada
+  const picksRound = games.length
     ? ((await sql`
         select game_id, player_id, encrypted_choice
         from public.picks
@@ -75,116 +76,106 @@ export async function GET(req: Request) {
     : [];
 
   const pickMap = new Map<string, string>();
-  for (const p of picks) pickMap.set(`${p.game_id}|${p.player_id}`, p.encrypted_choice);
+  for (const p of picksRound) pickMap.set(`${p.game_id}|${p.player_id}`, p.encrypted_choice);
 
-  // resultado real por jogo (se placar preenchido)
-  const gameReal = new Map<string, Choice | null>();
+  // resultado real e gabarito por jogo (se placar existe)
+  const realByGame = new Map<string, Choice | null>();
+  const gabaritoByGame = new Map<string, OneXTwo | null>();
+
   for (const g of games) {
-    if (g.score1 === null || g.score2 === null) gameReal.set(g.id, null);
-    else gameReal.set(g.id, resultFromScore(Number(g.score1), Number(g.score2)));
+    if (g.score1 === null || g.score2 === null) {
+      realByGame.set(g.id, null);
+      gabaritoByGame.set(g.id, null);
+    } else {
+      const real = resultFromScore(Number(g.score1), Number(g.score2));
+      realByGame.set(g.id, real);
+      gabaritoByGame.set(g.id, to1X2(real));
+    }
   }
 
-  // Totais da rodada
-  const totalsRound = players.map((pl) => ({
-    playerId: pl.id,
-    name: pl.name,
-    totalRound: 0,
-    // para você (admin) poder auditar depois, deixo por jogo também
-    perGame: games.map((g) => ({
-      gameId: g.id,
-      pick: null as ("1" | "X" | "2" | null),
-      pts: null as (number | null),
-    })),
-  }));
-  const byPlayer = new Map<string, (typeof totalsRound)[number]>();
-  for (const t of totalsRound) byPlayer.set(t.playerId, t);
-
-  games.forEach((g, gi) => {
-    const real = gameReal.get(g.id);
-    for (const pl of players) {
-      const t = byPlayer.get(pl.id)!;
+  // grid: [playerIndex][gameIndex] => pick + points
+  const grid = players.map((pl) =>
+    games.map((g) => {
       const enc = pickMap.get(`${g.id}|${pl.id}`);
-      if (!enc) continue;
-
-      let pick: Choice;
-      try {
-        pick = decryptChoice(enc) as Choice;
-      } catch {
-        continue;
+      if (!enc) {
+        return { pick: null as OneXTwo | null, points: null as number | null };
       }
 
-      const pick1x2: "1" | "X" | "2" =
-        pick === "TEAM1" ? "1" : pick === "TEAM2" ? "2" : "X";
+      let pickChoice: Choice;
+      try {
+        pickChoice = decryptChoice(enc) as Choice;
+      } catch {
+        return { pick: null, points: null };
+      }
 
-      t.perGame[gi].pick = pick1x2;
+      const pick1x2 = to1X2(pickChoice);
+      const real = realByGame.get(g.id);
 
-      if (!real) continue; // sem placar => sem pontos ainda
+      if (!real) {
+        // sem placar ainda: mostra palpite, mas pontos ficam null
+        return { pick: pick1x2, points: null };
+      }
 
-      const pts = pointsForPick(real, pick);
-      t.perGame[gi].pts = pts;
-      t.totalRound += pts;
-    }
+      return { pick: pick1x2, points: pointsForPick(real, pickChoice) };
+    })
+  );
+
+  // total da rodada por player (somando só jogos com points != null)
+  const totalsRound = players.map((pl, pi) => {
+    const total = grid[pi].reduce((acc, cell) => acc + (cell.points ?? 0), 0);
+    return { playerId: pl.id, name: pl.name, totalRound: total };
   });
 
-  // Acumulado geral (considera TODOS os jogos com placar em qualquer rodada)
-  const gamesScored = (await sql`
+  // acumulado geral (todos os jogos com placar, todas as rodadas)
+  const gamesScoredAll = (await sql`
     select id, score1, score2
     from public.games
     where score1 is not null and score2 is not null
   `) as any[];
 
   const realAll = new Map<string, Choice>();
-  for (const g of gamesScored) realAll.set(g.id, resultFromScore(Number(g.score1), Number(g.score2)));
+  for (const g of gamesScoredAll) {
+    realAll.set(g.id, resultFromScore(Number(g.score1), Number(g.score2)));
+  }
 
-  const picksAll = gamesScored.length
+  const picksAll = gamesScoredAll.length
     ? ((await sql`
         select game_id, player_id, encrypted_choice
         from public.picks
-        where game_id = any(${gamesScored.map((g) => g.id)})
+        where game_id = any(${gamesScoredAll.map((g) => g.id)})
       `) as any[])
     : [];
 
-  const totalOverall = players.map((pl) => ({
-    playerId: pl.id,
-    name: pl.name,
-    totalOverall: 0,
-  }));
-  const overallMap = new Map<string, (typeof totalOverall)[number]>();
-  for (const t of totalOverall) overallMap.set(t.playerId, t);
+  const overall = players.map((pl) => ({ playerId: pl.id, name: pl.name, totalOverall: 0 }));
+  const overallMap = new Map<string, (typeof overall)[number]>();
+  for (const t of overall) overallMap.set(t.playerId, t);
 
   for (const p of picksAll) {
     const real = realAll.get(p.game_id);
     if (!real) continue;
 
-    let pick: Choice;
+    let pickChoice: Choice;
     try {
-      pick = decryptChoice(p.encrypted_choice) as Choice;
+      pickChoice = decryptChoice(p.encrypted_choice) as Choice;
     } catch {
       continue;
     }
 
-    overallMap.get(p.player_id)!.totalOverall += pointsForPick(real, pick);
+    overallMap.get(p.player_id)!.totalOverall += pointsForPick(real, pickChoice);
   }
 
-  // gabarito 1/X/2 por jogo (null se sem placar)
-  const gabarito = games.map((g) => {
-    const real = gameReal.get(g.id);
-    return {
-      gameId: g.id,
-      gabarito: real ? resultTo1X2(real) : null,
-    };
-  });
-
-  // ordenações úteis
+  // ordenações para exibição (ranking)
   const totalsRoundSorted = [...totalsRound].sort(
     (a, b) => b.totalRound - a.totalRound || a.name.localeCompare(b.name)
   );
-  const totalOverallSorted = [...totalOverall].sort(
+
+  const overallSorted = [...overall].sort(
     (a, b) => b.totalOverall - a.totalOverall || a.name.localeCompare(b.name)
   );
 
   return NextResponse.json({
     round: block.round,
+    players: players.map((p) => ({ id: p.id, name: p.name })),
     games: games.map((g) => ({
       id: g.id,
       kickoff_at: g.kickoff_at,
@@ -192,15 +183,10 @@ export async function GET(req: Request) {
       team2: g.team2,
       score1: g.score1,
       score2: g.score2,
+      gabarito: gabaritoByGame.get(g.id) ?? null,
     })),
-    gabarito,
-    totalsRound: totalsRoundSorted.map((t) => ({
-      name: t.name,
-      totalRound: t.totalRound,
-    })),
-    totalOverall: totalOverallSorted.map((t) => ({
-      name: t.name,
-      totalOverall: t.totalOverall,
-    })),
+    grid, // [player][game] => { pick: "1"|"X"|"2"|null, points: -1|0|3|null }
+    totalsRound: totalsRoundSorted,
+    overall: overallSorted,
   });
 }
