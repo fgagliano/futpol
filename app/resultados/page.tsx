@@ -95,10 +95,12 @@ async function loadRevealFlag() {
     }
   }
 
-  useEffect(() => {
-    load(1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+ useEffect(() => {
+  loadRevealFlag();
+  load(1);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, []);
+
 
   const overallMap = useMemo(() => {
     const m = new Map<string, number>();
