@@ -333,12 +333,13 @@ load(rnd);
                             <td key={g.id} className="px-4 py-3 ring-1 ring-slate-200">
                               <span
                                 className={[
-                                  "inline-flex items-center justify-center rounded-full px-2.5 py-1 text-xs font-bold ring-1",
-                                  pillPts(cell.points),
-                                ].join(" ")}
-                              >
-                                {fmtPts(cell.points)}
-                              </span>
+  "inline-flex items-center justify-center rounded-full px-2.5 py-1 text-xs font-bold ring-1",
+  isRevealed ? pillPts(cell.points) : NEUTRAL_BADGE,
+].join(" ")}
+>
+  {isRevealed ? fmtPts(cell.points) : "—"}
+</span>
+
                             </td>
                           );
                         })}
