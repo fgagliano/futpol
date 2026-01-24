@@ -300,7 +300,8 @@ load(rnd);
                                   pickBadge(cell.pick),
                                 ].join(" ")}
                               >
-                                {cell.pick ?? "—"}
+                               {isRevealed ? (cell.pick ?? "—") : "—"}
+
                               </span>
                             </td>
                           );
