@@ -55,6 +55,13 @@ function pickBadge(pick: OneXTwo | null) {
   return "bg-amber-50 text-amber-800 ring-amber-100"; // X
 }
 const NEUTRAL_BADGE = "bg-slate-100 text-slate-600 ring-slate-200";
+function safePickClass(pick: OneXTwo | null, revealed: boolean) {
+  return revealed ? pickBadge(pick) : NEUTRAL_BADGE;
+}
+
+function safeText<T>(value: T, revealed: boolean, placeholder = "—") {
+  return revealed ? (value as any) ?? placeholder : placeholder;
+}
 
 export default function ResultadosPage() {
   const [round, setRound] = useState(1);
