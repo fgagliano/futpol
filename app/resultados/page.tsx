@@ -60,6 +60,18 @@ export default function ResultadosPage() {
   const [data, setData] = useState<Resp | null>(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+const [isRevealed, setIsRevealed] = useState(false);
+
+async function loadRevealFlag() {
+  try {
+    const r = await fetch(`/api/block/current?ts=${Date.now()}`, { cache: "no-store" });
+    const j = (await r.json()) as BlockResp;
+    setIsRevealed(!!j?.isRevealed);
+  } catch {
+    // se der erro de rede, por segurança NÃO revela
+    setIsRevealed(false);
+  }
+}
 
   async function load(rnd: number) {
     setLoading(true);
