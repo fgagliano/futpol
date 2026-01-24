@@ -54,6 +54,7 @@ function pickBadge(pick: OneXTwo | null) {
   if (pick === "2") return "bg-blue-50 text-blue-700 ring-blue-100";
   return "bg-amber-50 text-amber-800 ring-amber-100"; // X
 }
+const NEUTRAL_BADGE = "bg-slate-100 text-slate-600 ring-slate-200";
 
 export default function ResultadosPage() {
   const [round, setRound] = useState(1);
