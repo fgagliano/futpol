@@ -4,7 +4,6 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 
 type BlockResp = { isRevealed: boolean };
 
-
 type OneXTwo = "1" | "X" | "2";
 
 type Resp = {
@@ -54,13 +53,15 @@ function pickBadge(pick: OneXTwo | null) {
   if (pick === "2") return "bg-blue-50 text-blue-700 ring-blue-100";
   return "bg-amber-50 text-amber-800 ring-amber-100"; // X
 }
+
 const NEUTRAL_BADGE = "bg-slate-100 text-slate-600 ring-slate-200";
+
 function safePickClass(pick: OneXTwo | null, revealed: boolean) {
   return revealed ? pickBadge(pick) : NEUTRAL_BADGE;
 }
 
 function safeText<T>(value: T, revealed: boolean, placeholder = "—") {
-  return revealed ? (value as any) ?? placeholder : placeholder;
+  return revealed ? ((value as any) ?? placeholder) : placeholder;
 }
 
 export default function ResultadosPage() {
@@ -68,18 +69,18 @@ export default function ResultadosPage() {
   const [data, setData] = useState<Resp | null>(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-const [isRevealed, setIsRevealed] = useState(false);
+  const [isRevealed, setIsRevealed] = useState(false);
 
-async function loadRevealFlag() {
-  try {
-    const r = await fetch(`/api/block/current?ts=${Date.now()}`, { cache: "no-store" });
-    const j = (await r.json()) as BlockResp;
-    setIsRevealed(!!j?.isRevealed);
-  } catch {
-    // se der erro de rede, por segurança NÃO revela
-    setIsRevealed(false);
+  async function loadRevealFlag() {
+    try {
+      const r = await fetch(`/api/block/current?ts=${Date.now()}`, { cache: "no-store" });
+      const j = (await r.json()) as BlockResp;
+      setIsRevealed(!!j?.isRevealed);
+    } catch {
+      // se der erro de rede, por segurança NÃO revela
+      setIsRevealed(false);
+    }
   }
-}
 
   async function load(rnd: number) {
     setLoading(true);
@@ -103,12 +104,11 @@ async function loadRevealFlag() {
     }
   }
 
- useEffect(() => {
-  loadRevealFlag();
-  load(1);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-}, []);
-
+  useEffect(() => {
+    loadRevealFlag();
+    load(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const overallMap = useMemo(() => {
     const m = new Map<string, number>();
@@ -129,10 +129,9 @@ async function loadRevealFlag() {
 
           <button
             onClick={() => {
-  loadRevealFlag();
-  load(round);
-}}
-
+              loadRevealFlag();
+              load(round);
+            }}
             disabled={loading}
             className={[
               "rounded-2xl px-4 py-2 text-sm font-semibold shadow-sm",
@@ -154,9 +153,8 @@ async function loadRevealFlag() {
                 onChange={(e) => {
                   const rnd = Number(e.target.value);
                   setRound(rnd);
-loadRevealFlag();
-load(rnd);
-
+                  loadRevealFlag();
+                  load(rnd);
                 }}
                 className="w-44 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600"
               >
@@ -168,9 +166,7 @@ load(rnd);
               </select>
             </div>
 
-            <div className="text-xs text-slate-500">
-              {data ? `Rodada carregada: ${data.round}` : "—"}
-            </div>
+            <div className="text-xs text-slate-500">{data ? `Rodada carregada: ${data.round}` : "—"}</div>
           </div>
 
           {err && (
@@ -249,7 +245,9 @@ load(rnd);
                   ))}
 
                   <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wide text-slate-600 ring-1 ring-slate-200">
-                    Total<br />Rodada
+                    Total
+                    <br />
+                    Rodada
                   </th>
                   <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wide text-slate-600 ring-1 ring-slate-200">
                     Acum.
@@ -267,9 +265,7 @@ load(rnd);
                   {(data?.games || []).map((g) => (
                     <td key={g.id} className="px-4 py-3 ring-1 ring-slate-200">
                       <div className="flex items-center justify-between">
-                        <span className="text-sm font-semibold text-slate-900">
-                          {g.gabarito ?? "—"}
-                        </span>
+                        <span className="text-sm font-semibold text-slate-900">{g.gabarito ?? "—"}</span>
                         <span className="text-xs font-semibold text-slate-600">
                           {g.score1 !== null && g.score2 !== null ? `${g.score1}x${g.score2}` : ""}
                         </span>
@@ -277,21 +273,25 @@ load(rnd);
                     </td>
                   ))}
 
-                  <td className="px-4 py-3 text-center ring-1 ring-slate-200 text-sm font-semibold text-slate-700">—</td>
-                  <td className="px-4 py-3 text-center ring-1 ring-slate-200 text-sm font-semibold text-slate-700">—</td>
+                  <td className="px-4 py-3 text-center ring-1 ring-slate-200 text-sm font-semibold text-slate-700">
+                    —
+                  </td>
+                  <td className="px-4 py-3 text-center ring-1 ring-slate-200 text-sm font-semibold text-slate-700">
+                    —
+                  </td>
                 </tr>
 
                 {/* PLAYERS: 2 linhas por jogador */}
                 {(data?.players || []).map((pl, pi) => {
                   const rowPick = data?.grid?.[pi] || [];
-                  const totalRound =
-                    rowPick.reduce((acc, c) => acc + (c.points ?? 0), 0) ?? 0;
+                  const totalRound = rowPick.reduce((acc, c) => acc + (c.points ?? 0), 0) ?? 0;
+                  const totalRoundSafe = isRevealed ? totalRound : null;
+
                   const acum = overallMap.get(pl.id) ?? 0;
 
                   return (
-<Fragment key={pl.id}>
-
-                    {/* linha Palpite */}
+                    <Fragment key={pl.id}>
+                      {/* linha Palpite */}
                       <tr className="bg-white">
                         <td className="sticky left-0 z-10 bg-white px-4 py-3 ring-1 ring-slate-200">
                           <div className="text-sm font-bold text-slate-900">{pl.name}</div>
@@ -303,22 +303,24 @@ load(rnd);
                           return (
                             <td key={g.id} className="px-4 py-3 ring-1 ring-slate-200">
                               <span
-  className={`rounded-full px-2.5 py-1 text-xs font-bold ring-1 ${safePickClass(
-    cell.pick,
-    isRevealed
-  )}`}
->
-  {safeText(cell.pick, isRevealed)}
-</span>
-
-
+                                className={`rounded-full px-2.5 py-1 text-xs font-bold ring-1 ${safePickClass(
+                                  cell.pick,
+                                  isRevealed
+                                )}`}
+                              >
+                                {safeText(cell.pick, isRevealed)}
+                              </span>
                             </td>
                           );
                         })}
 
                         <td className="px-4 py-3 text-center ring-1 ring-slate-200">
-                          <span className={`rounded-full px-2.5 py-1 text-xs font-bold ring-1 ${pillPts(totalRound)}`}>
-                            {fmtPts(totalRound)}
+                          <span
+                            className={`rounded-full px-2.5 py-1 text-xs font-bold ring-1 ${pillPts(
+                              totalRoundSafe
+                            )}`}
+                          >
+                            {fmtPts(totalRoundSafe)}
                           </span>
                         </td>
 
@@ -341,21 +343,23 @@ load(rnd);
                             <td key={g.id} className="px-4 py-3 ring-1 ring-slate-200">
                               <span
                                 className={[
-  "inline-flex items-center justify-center rounded-full px-2.5 py-1 text-xs font-bold ring-1",
-  isRevealed ? pillPts(cell.points) : NEUTRAL_BADGE,
-].join(" ")}
->
-  {isRevealed ? fmtPts(cell.points) : "—"}
-</span>
-
+                                  "inline-flex items-center justify-center rounded-full px-2.5 py-1 text-xs font-bold ring-1",
+                                  isRevealed ? pillPts(cell.points) : NEUTRAL_BADGE,
+                                ].join(" ")}
+                              >
+                                {isRevealed ? fmtPts(cell.points) : "—"}
+                              </span>
                             </td>
                           );
                         })}
 
                         <td className="px-4 py-3 text-center ring-1 ring-slate-200 text-sm font-semibold text-slate-700">
-                          {/* repetimos o total aqui como você faz no excel (opcional). Se não quiser, troca por "—" */}
-                          <span className={`rounded-full px-2.5 py-1 text-xs font-bold ring-1 ${pillPts(totalRound)}`}>
-                            {fmtPts(totalRound)}
+                          <span
+                            className={`rounded-full px-2.5 py-1 text-xs font-bold ring-1 ${pillPts(
+                              totalRoundSafe
+                            )}`}
+                          >
+                            {fmtPts(totalRoundSafe)}
                           </span>
                         </td>
 
@@ -364,7 +368,6 @@ load(rnd);
                         </td>
                       </tr>
                     </Fragment>
-
                   );
                 })}
               </tbody>
@@ -377,6 +380,8 @@ load(rnd);
           {(data?.players || []).map((pl, pi) => {
             const row = data?.grid?.[pi] || [];
             const totalRound = row.reduce((acc, c) => acc + (c.points ?? 0), 0);
+            const totalRoundSafe = isRevealed ? totalRound : null;
+
             const acum = overallMap.get(pl.id) ?? 0;
 
             return (
@@ -386,8 +391,12 @@ load(rnd);
                     <div className="text-base font-bold text-slate-900">{pl.name}</div>
                     <div className="mt-1 text-xs text-slate-500">
                       Total rodada:{" "}
-                      <span className={`rounded-full px-2 py-0.5 text-xs font-bold ring-1 ${pillPts(totalRound)}`}>
-                        {fmtPts(totalRound)}
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-xs font-bold ring-1 ${pillPts(
+                          totalRoundSafe
+                        )}`}
+                      >
+                        {fmtPts(totalRoundSafe)}
                       </span>{" "}
                       • Acum.:{" "}
                       <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-700 ring-1 ring-slate-200">
@@ -400,26 +409,36 @@ load(rnd);
                 <div className="mt-3 space-y-2">
                   {(data?.games || []).map((g, gi) => {
                     const cell = row[gi] || { pick: null, points: null };
+
                     return (
                       <div key={g.id} className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2">
                         <div className="text-xs font-semibold text-slate-700">
                           {gi + 1}. {g.team1} x {g.team2}
                           <div className="mt-0.5 text-[11px] font-medium text-slate-500">
-                            Gab: {g.gabarito ?? "—"} • {g.score1 !== null && g.score2 !== null ? `${g.score1}x${g.score2}` : "sem placar"}
+                            Gab: {g.gabarito ?? "—"} •{" "}
+                            {g.score1 !== null && g.score2 !== null ? `${g.score1}x${g.score2}` : "sem placar"}
                           </div>
                         </div>
 
                         <div className="flex items-center gap-2">
-                          <span className={`rounded-full px-2.5 py-1 text-xs font-bold ring-1 ${pickBadge(cell.pick)}`}>
-{isRevealed ? (cell.pick ?? "—") : "—"}
-                         <span
-  className={`rounded-full px-2.5 py-1 text-xs font-bold ring-1 ${
-    isRevealed ? pillPts(cell.points) : NEUTRAL_BADGE
-  }`}
->
-  {isRevealed ? fmtPts(cell.points) : "—"}
-</span>
+                          {/* Palpite: NEUTRO quando não revelado (não vaza 1/X/2 por cor) */}
+                          <span
+                            className={`rounded-full px-2.5 py-1 text-xs font-bold ring-1 ${safePickClass(
+                              cell.pick,
+                              isRevealed
+                            )}`}
+                          >
+                            {safeText(cell.pick, isRevealed)}
+                          </span>
 
+                          {/* Pontos: NEUTRO quando não revelado */}
+                          <span
+                            className={`rounded-full px-2.5 py-1 text-xs font-bold ring-1 ${
+                              isRevealed ? pillPts(cell.points) : NEUTRAL_BADGE
+                            }`}
+                          >
+                            {isRevealed ? fmtPts(cell.points) : "—"}
+                          </span>
                         </div>
                       </div>
                     );
@@ -429,7 +448,8 @@ load(rnd);
             );
           })}
         </div>
-                {/* RANKINGS (FINAL) */}
+
+        {/* RANKINGS (FINAL) */}
         {data && (
           <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
             {/* Ranking da Rodada */}
@@ -448,19 +468,17 @@ load(rnd);
                     className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2"
                   >
                     <div className="flex items-center gap-2">
-                      <span className="w-6 text-center text-sm font-extrabold text-slate-700">
-                        {idx + 1}º
-                      </span>
+                      <span className="w-6 text-center text-sm font-extrabold text-slate-700">{idx + 1}º</span>
                       <span className="text-sm font-bold text-slate-900">{r.name}</span>
                     </div>
 
                     <span
                       className={[
                         "rounded-full px-2.5 py-1 text-xs font-bold ring-1",
-                        pillPts(r.totalRound),
+                        isRevealed ? pillPts(r.totalRound) : NEUTRAL_BADGE,
                       ].join(" ")}
                     >
-                      {fmtPts(r.totalRound)}
+                      {isRevealed ? fmtPts(r.totalRound) : "—"}
                     </span>
                   </div>
                 ))}
@@ -483,9 +501,7 @@ load(rnd);
                     className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2"
                   >
                     <div className="flex items-center gap-2">
-                      <span className="w-6 text-center text-sm font-extrabold text-slate-700">
-                        {idx + 1}º
-                      </span>
+                      <span className="w-6 text-center text-sm font-extrabold text-slate-700">{idx + 1}º</span>
                       <span className="text-sm font-bold text-slate-900">{r.name}</span>
                     </div>
 
@@ -498,7 +514,6 @@ load(rnd);
             </div>
           </div>
         )}
-
       </div>
     </main>
   );
