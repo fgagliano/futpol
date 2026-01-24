@@ -412,10 +412,14 @@ load(rnd);
                         <div className="flex items-center gap-2">
                           <span className={`rounded-full px-2.5 py-1 text-xs font-bold ring-1 ${pickBadge(cell.pick)}`}>
 {isRevealed ? (cell.pick ?? "—") : "—"}
-                          </span>
-                          <span className={`rounded-full px-2.5 py-1 text-xs font-bold ring-1 ${pillPts(cell.points)}`}>
-                            {fmtPts(cell.points)}
-                          </span>
+                         <span
+  className={`rounded-full px-2.5 py-1 text-xs font-bold ring-1 ${
+    isRevealed ? pillPts(cell.points) : NEUTRAL_BADGE
+  }`}
+>
+  {isRevealed ? fmtPts(cell.points) : "—"}
+</span>
+
                         </div>
                       </div>
                     );
