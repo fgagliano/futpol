@@ -2,6 +2,8 @@
 
 import { Fragment, useEffect, useMemo, useState } from "react";
 
+type BlockResp = { isRevealed: boolean };
+
 
 type OneXTwo = "1" | "X" | "2";
 
