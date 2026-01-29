@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 type ApiByRoundResp = {
   block: { id: string; round: number; kickoffMin: string | null } | null;
@@ -67,13 +67,7 @@ function toIsoWithLocalTz(datetimeLocal: string) {
   return `${yyyy}-${mm}-${dd}T${hh}:${mi}:${ss}${sign}${offH}:${offM}`;
 }
 
-function Pill({
-  kind,
-  children,
-}: {
-  kind: "ok" | "warn" | "info";
-  children: React.ReactNode;
-}) {
+function Pill({ kind, children }: { kind: "ok" | "warn" | "info"; children: ReactNode }) {
   const cls =
     kind === "ok"
       ? "bg-emerald-50 text-emerald-700 ring-emerald-100"
@@ -88,13 +82,7 @@ function Pill({
   );
 }
 
-function Notice({
-  kind,
-  text,
-}: {
-  kind: "ok" | "err";
-  text: string;
-}) {
+function Notice({ kind, text }: { kind: "ok" | "err"; text: string }) {
   const cls =
     kind === "ok"
       ? "bg-emerald-50 text-emerald-800 ring-emerald-100"
@@ -140,7 +128,6 @@ export default function AdminGamesPage() {
       );
       const j = (await r.json()) as ApiByRoundResp;
 
-      // rodada ainda não existe: tela vazia “bonita”
       if (!j.block) {
         setRound(rnd);
         setGames(emptyGames());
@@ -186,16 +173,14 @@ export default function AdminGamesPage() {
 
     try {
       const payload = {
-  round,
-  games: games.map((g) => ({
-    ...(g.id ? { id: g.id } : {}),
-    kickoff_at: toIsoWithLocalTz(g.kickoff_at),
-    team1: g.team1.trim(),
-    team2: g.team2.trim(),
-  })),
-};
-
-
+        round,
+        games: games.map((g) => ({
+          ...(g.id ? { id: g.id } : {}),
+          kickoff_at: toIsoWithLocalTz(g.kickoff_at),
+          team1: g.team1.trim(),
+          team2: g.team2.trim(),
+        })),
+      };
 
       const r = await fetch("/api/admin/block", {
         method: "POST",
@@ -337,16 +322,14 @@ export default function AdminGamesPage() {
               >
                 {busySaveGames ? "Salvando…" : "Salvar jogos"}
               </button>
-
-              
             </div>
           </div>
 
           {msg && msgKind && <Notice kind={msgKind} text={msg} />}
 
           <div className="mt-3 text-xs text-slate-500">
-            <span className="font-semibold">Salvar jogos</span> cria/atualiza kickoff e times.{" "}
-            <span className="font-semibold">Salvar placares</span> só atualiza <code>score1/score2</code> (não apaga nada).
+            <span className="font-semibold">Salvar jogos</span> cria/atualiza kickoff e times. O botão “Salvar” ao lado do placar
+            salva <code>score1/score2</code>.
           </div>
         </div>
 
@@ -415,55 +398,56 @@ export default function AdminGamesPage() {
                 </div>
               </div>
 
-  {/* SCORE (bonito, compacto) */}
-<div className="mt-4">
-  <label className="block text-xs font-semibold uppercase tracking-wide text-slate-600">
-    Placar (opcional)
-  </label>
+              {/* SCORE + BOTÃO SALVAR (por jogo) */}
+              <div className="mt-4">
+                <label className="block text-xs font-semibold uppercase tracking-wide text-slate-600">
+                  Placar (opcional)
+                </label>
 
-  <div className="mt-2 flex items-stretch gap-2">
-    <div className="inline-flex items-stretch overflow-hidden rounded-xl border border-slate-300 bg-white">
-      <input
-        inputMode="numeric"
-        value={g.score1}
-        onChange={(e) => setGame(i, { score1: e.target.value })}
-        placeholder="—"
-        className="w-16 px-3 py-2 text-center text-sm font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600"
-      />
-      <div className="flex items-center justify-center px-3 text-sm font-semibold text-slate-400">
-        x
-      </div>
-      <input
-        inputMode="numeric"
-        value={g.score2}
-        onChange={(e) => setGame(i, { score2: e.target.value })}
-        placeholder="—"
-        className="w-16 px-3 py-2 text-center text-sm font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600"
-      />
-    </div>
+                <div className="mt-2 flex items-stretch gap-2">
+                  <div className="inline-flex items-stretch overflow-hidden rounded-xl border border-slate-300 bg-white">
+                    <input
+                      inputMode="numeric"
+                      value={g.score1}
+                      onChange={(e) => setGame(i, { score1: e.target.value })}
+                      placeholder="—"
+                      className="w-16 px-3 py-2 text-center text-sm font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                    />
+                    <div className="flex items-center justify-center px-3 text-sm font-semibold text-slate-400">
+                      x
+                    </div>
+                    <input
+                      inputMode="numeric"
+                      value={g.score2}
+                      onChange={(e) => setGame(i, { score2: e.target.value })}
+                      placeholder="—"
+                      className="w-16 px-3 py-2 text-center text-sm font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                    />
+                  </div>
 
-    {/* botão pequeno ao lado do placar */}
-    <button
-      type="button"
-      title="Salvar placares"
-      onClick={saveScoresOnly}
-      disabled={!hasIds || busySaveScores}
-      className={[
-        "shrink-0 rounded-xl px-3 py-2 text-sm font-extrabold shadow-sm ring-1 transition",
-        hasIds && !busySaveScores
-          ? "bg-blue-700 text-white ring-blue-700 hover:bg-blue-800"
-          : "bg-slate-200 text-slate-500 ring-slate-200 cursor-not-allowed",
-      ].join(" ")}
-    >
-      {busySaveScores ? "…" : "Salvar"}
-    </button>
-  </div>
+                  <button
+                    type="button"
+                    title="Salvar placares"
+                    onClick={saveScoresOnly}
+                    disabled={!hasIds || busySaveScores}
+                    className={[
+                      "shrink-0 rounded-xl px-3 py-2 text-sm font-extrabold shadow-sm ring-1 transition",
+                      hasIds && !busySaveScores
+                        ? "bg-blue-700 text-white ring-blue-700 hover:bg-blue-800"
+                        : "bg-slate-200 text-slate-500 ring-slate-200 cursor-not-allowed",
+                    ].join(" ")}
+                  >
+                    {busySaveScores ? "…" : "Salvar"}
+                  </button>
+                </div>
 
-  <div className="mt-2 text-xs text-slate-500">
-    Deixe vazio para <span className="font-semibold">null</span>. Salve placares quando quiser (mesmo parcial).
-  </div>
-</div>
-
+                <div className="mt-2 text-xs text-slate-500">
+                  Deixe vazio para <span className="font-semibold">null</span>. (O botão salva os 5 placares de uma vez.)
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
 
         {/* FOOTER HELP */}
         <div className="mt-6 text-xs text-slate-500">
