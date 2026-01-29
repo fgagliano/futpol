@@ -338,18 +338,7 @@ export default function AdminGamesPage() {
                 {busySaveGames ? "Salvando…" : "Salvar jogos"}
               </button>
 
-              <button
-                onClick={saveScoresOnly}
-                disabled={!hasIds || busySaveScores}
-                className={[
-                  "rounded-2xl px-4 py-2 text-sm font-semibold shadow-sm",
-                  hasIds && !busySaveScores
-                    ? "bg-blue-700 text-white hover:bg-blue-800"
-                    : "bg-slate-200 text-slate-500 cursor-not-allowed",
-                ].join(" ")}
-              >
-                {busySaveScores ? "Salvando…" : "Salvar placares"}
-              </button>
+              
             </div>
           </div>
 
