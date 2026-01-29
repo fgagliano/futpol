@@ -186,13 +186,15 @@ export default function AdminGamesPage() {
 
     try {
       const payload = {
-        round,
-        games: games.map((g) => ({
-          kickoff_at: toIsoWithLocalTz(g.kickoff_at),
-          team1: g.team1.trim(),
-          team2: g.team2.trim(),
-        })),
-      };
+  round,
+  games: games.map((g) => ({
+    id: g.id ?? null,
+    kickoff_at: toIsoWithLocalTz(g.kickoff_at),
+    team1: g.team1.trim(),
+    team2: g.team2.trim(),
+  })),
+};
+
 
       const r = await fetch("/api/admin/block", {
         method: "POST",
