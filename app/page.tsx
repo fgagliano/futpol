@@ -88,7 +88,20 @@ export default function HomePage() {
 
   return (
    <main className="min-h-screen bg-slate-50 p-4 sm:p-6">
-  {/* AÇÕES PRINCIPAIS (TOPO) */}
+  <a
+  href="#"
+  onClick={(e) => {
+    e.preventDefault();
+    const pass = prompt("");
+    if (pass === "10") window.location.href = "/admin/games";
+  }}
+  className="fixed right-3 top-3 z-50 select-none text-xl opacity-30 hover:opacity-80"
+  aria-label="."
+  title="."
+>
+  🧩
+</a>
+
   {/* AÇÕES PRINCIPAIS (TOPO) */}
 <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
   <a
