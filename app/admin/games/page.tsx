@@ -415,39 +415,55 @@ export default function AdminGamesPage() {
                 </div>
               </div>
 
-              {/* SCORE (bonito, compacto) */}
-              <div className="mt-4">
-                <label className="block text-xs font-semibold uppercase tracking-wide text-slate-600">
-                  Placar (opcional)
-                </label>
+  {/* SCORE (bonito, compacto) */}
+<div className="mt-4">
+  <label className="block text-xs font-semibold uppercase tracking-wide text-slate-600">
+    Placar (opcional)
+  </label>
 
-                <div className="mt-2 inline-flex items-stretch overflow-hidden rounded-xl border border-slate-300 bg-white">
-                  <input
-                    inputMode="numeric"
-                    value={g.score1}
-                    onChange={(e) => setGame(i, { score1: e.target.value })}
-                    placeholder="—"
-                    className="w-16 px-3 py-2 text-center text-sm font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600"
-                  />
-                  <div className="flex items-center justify-center px-3 text-sm font-semibold text-slate-400">
-                    x
-                  </div>
-                  <input
-                    inputMode="numeric"
-                    value={g.score2}
-                    onChange={(e) => setGame(i, { score2: e.target.value })}
-                    placeholder="—"
-                    className="w-16 px-3 py-2 text-center text-sm font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600"
-                  />
-                </div>
+  <div className="mt-2 flex items-stretch gap-2">
+    <div className="inline-flex items-stretch overflow-hidden rounded-xl border border-slate-300 bg-white">
+      <input
+        inputMode="numeric"
+        value={g.score1}
+        onChange={(e) => setGame(i, { score1: e.target.value })}
+        placeholder="—"
+        className="w-16 px-3 py-2 text-center text-sm font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600"
+      />
+      <div className="flex items-center justify-center px-3 text-sm font-semibold text-slate-400">
+        x
+      </div>
+      <input
+        inputMode="numeric"
+        value={g.score2}
+        onChange={(e) => setGame(i, { score2: e.target.value })}
+        placeholder="—"
+        className="w-16 px-3 py-2 text-center text-sm font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600"
+      />
+    </div>
 
-                <div className="mt-2 text-xs text-slate-500">
-                  Deixe vazio para <span className="font-semibold">null</span>. Salve placares quando quiser (mesmo parcial).
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
+    {/* botão pequeno ao lado do placar */}
+    <button
+      type="button"
+      title="Salvar placares"
+      onClick={saveScoresOnly}
+      disabled={!hasIds || busySaveScores}
+      className={[
+        "shrink-0 rounded-xl px-3 py-2 text-sm font-extrabold shadow-sm ring-1 transition",
+        hasIds && !busySaveScores
+          ? "bg-blue-700 text-white ring-blue-700 hover:bg-blue-800"
+          : "bg-slate-200 text-slate-500 ring-slate-200 cursor-not-allowed",
+      ].join(" ")}
+    >
+      {busySaveScores ? "…" : "Salvar"}
+    </button>
+  </div>
+
+  <div className="mt-2 text-xs text-slate-500">
+    Deixe vazio para <span className="font-semibold">null</span>. Salve placares quando quiser (mesmo parcial).
+  </div>
+</div>
+
 
         {/* FOOTER HELP */}
         <div className="mt-6 text-xs text-slate-500">
