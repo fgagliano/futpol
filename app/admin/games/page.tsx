@@ -270,18 +270,13 @@ export default function AdminGamesPage() {
             </p>
           </div>
 
-          <button
-            onClick={() => loadRound(round)}
-            disabled={loadingRound}
-            className={[
-              "rounded-2xl px-4 py-2 text-sm font-semibold shadow-sm",
-              loadingRound
-                ? "bg-slate-200 text-slate-500 cursor-not-allowed"
-                : "bg-emerald-600 text-white hover:bg-emerald-700",
-            ].join(" ")}
-          >
-            {loadingRound ? "Carregando…" : "Recarregar"}
-          </button>
+          <a
+  href="/"
+  className="rounded-2xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700"
+>
+  Home
+</a>
+
         </div>
 
         {/* TOP CARD */}
