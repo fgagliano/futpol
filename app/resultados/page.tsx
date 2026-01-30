@@ -2,12 +2,12 @@
 
 import { Fragment, useEffect, useMemo, useState } from "react";
 
-type BlockResp = { isRevealed: boolean };
-
 type OneXTwo = "1" | "X" | "2";
 
 type Resp = {
   round: number;
+  isRevealed: boolean; // ✅ vem do /api/results/by-round
+  kickoffMin?: string | null; // opcional
   players: { id: string; name: string }[];
   games: {
     id: string;
@@ -56,31 +56,11 @@ function pickBadge(pick: OneXTwo | null) {
 
 const NEUTRAL_BADGE = "bg-slate-100 text-slate-600 ring-slate-200";
 
-function safePickClass(pick: OneXTwo | null, revealed: boolean) {
-  return revealed ? pickBadge(pick) : NEUTRAL_BADGE;
-}
-
-function safeText<T>(value: T, revealed: boolean, placeholder = "—") {
-  return revealed ? ((value as any) ?? placeholder) : placeholder;
-}
-
 export default function ResultadosPage() {
   const [round, setRound] = useState(1);
   const [data, setData] = useState<Resp | null>(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [isRevealed, setIsRevealed] = useState(false);
-
-  async function loadRevealFlag() {
-    try {
-      const r = await fetch(`/api/block/current?ts=${Date.now()}`, { cache: "no-store" });
-      const j = (await r.json()) as BlockResp;
-      setIsRevealed(!!j?.isRevealed);
-    } catch {
-      // se der erro de rede, por segurança NÃO revela
-      setIsRevealed(false);
-    }
-  }
 
   async function load(rnd: number) {
     setLoading(true);
@@ -105,7 +85,6 @@ export default function ResultadosPage() {
   }
 
   useEffect(() => {
-    loadRevealFlag();
     load(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -115,6 +94,8 @@ export default function ResultadosPage() {
     for (const o of data?.overall || []) m.set(o.playerId, o.totalOverall);
     return m;
   }, [data]);
+
+  const revealed = !!data?.isRevealed;
 
   return (
     <main className="min-h-screen bg-slate-50 p-4 sm:p-6">
@@ -128,10 +109,7 @@ export default function ResultadosPage() {
           </div>
 
           <button
-            onClick={() => {
-              loadRevealFlag();
-              load(round);
-            }}
+            onClick={() => load(round)}
             disabled={loading}
             className={[
               "rounded-2xl px-4 py-2 text-sm font-semibold shadow-sm",
@@ -153,7 +131,6 @@ export default function ResultadosPage() {
                 onChange={(e) => {
                   const rnd = Number(e.target.value);
                   setRound(rnd);
-                  loadRevealFlag();
                   load(rnd);
                 }}
                 className="w-44 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600"
@@ -166,8 +143,16 @@ export default function ResultadosPage() {
               </select>
             </div>
 
-            <div className="text-xs text-slate-500">{data ? `Rodada carregada: ${data.round}` : "—"}</div>
+            <div className="text-xs text-slate-500">
+              {data ? `Rodada carregada: ${data.round} • ${revealed ? "revelada" : "ainda bloqueada"}` : "—"}
+            </div>
           </div>
+
+          {!revealed && data && (
+            <div className="mt-3 rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-800 ring-1 ring-amber-100">
+              Palpites desta rodada ainda estão <b>bloqueados</b> (só revelam no kickoff do 1º jogo da rodada).
+            </div>
+          )}
 
           {err && (
             <div className="mt-3 rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-700 ring-1 ring-rose-100">
@@ -245,9 +230,7 @@ export default function ResultadosPage() {
                   ))}
 
                   <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wide text-slate-600 ring-1 ring-slate-200">
-                    Total
-                    <br />
-                    Rodada
+                    Total<br />Rodada
                   </th>
                   <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wide text-slate-600 ring-1 ring-slate-200">
                     Acum.
@@ -265,7 +248,9 @@ export default function ResultadosPage() {
                   {(data?.games || []).map((g) => (
                     <td key={g.id} className="px-4 py-3 ring-1 ring-slate-200">
                       <div className="flex items-center justify-between">
-                        <span className="text-sm font-semibold text-slate-900">{g.gabarito ?? "—"}</span>
+                        <span className="text-sm font-semibold text-slate-900">
+                          {g.gabarito ?? "—"}
+                        </span>
                         <span className="text-xs font-semibold text-slate-600">
                           {g.score1 !== null && g.score2 !== null ? `${g.score1}x${g.score2}` : ""}
                         </span>
@@ -273,19 +258,16 @@ export default function ResultadosPage() {
                     </td>
                   ))}
 
-                  <td className="px-4 py-3 text-center ring-1 ring-slate-200 text-sm font-semibold text-slate-700">
-                    —
-                  </td>
-                  <td className="px-4 py-3 text-center ring-1 ring-slate-200 text-sm font-semibold text-slate-700">
-                    —
-                  </td>
+                  <td className="px-4 py-3 text-center ring-1 ring-slate-200 text-sm font-semibold text-slate-700">—</td>
+                  <td className="px-4 py-3 text-center ring-1 ring-slate-200 text-sm font-semibold text-slate-700">—</td>
                 </tr>
 
                 {/* PLAYERS: 2 linhas por jogador */}
                 {(data?.players || []).map((pl, pi) => {
                   const rowPick = data?.grid?.[pi] || [];
-                  const totalRound = rowPick.reduce((acc, c) => acc + (c.points ?? 0), 0) ?? 0;
-                  const totalRoundSafe = isRevealed ? totalRound : null;
+
+                  const totalRoundCalc = rowPick.reduce((acc, c) => acc + (c.points ?? 0), 0) ?? 0;
+                  const totalRoundShown: number | null = revealed ? totalRoundCalc : null;
 
                   const acum = overallMap.get(pl.id) ?? 0;
 
@@ -303,12 +285,12 @@ export default function ResultadosPage() {
                           return (
                             <td key={g.id} className="px-4 py-3 ring-1 ring-slate-200">
                               <span
-                                className={`rounded-full px-2.5 py-1 text-xs font-bold ring-1 ${safePickClass(
-                                  cell.pick,
-                                  isRevealed
-                                )}`}
+                                className={[
+                                  "inline-flex items-center justify-center rounded-full px-2.5 py-1 text-xs font-bold ring-1",
+                                  revealed ? pickBadge(cell.pick) : NEUTRAL_BADGE,
+                                ].join(" ")}
                               >
-                                {safeText(cell.pick, isRevealed)}
+                                {revealed ? (cell.pick ?? "—") : "—"}
                               </span>
                             </td>
                           );
@@ -316,11 +298,12 @@ export default function ResultadosPage() {
 
                         <td className="px-4 py-3 text-center ring-1 ring-slate-200">
                           <span
-                            className={`rounded-full px-2.5 py-1 text-xs font-bold ring-1 ${pillPts(
-                              totalRoundSafe
-                            )}`}
+                            className={[
+                              "rounded-full px-2.5 py-1 text-xs font-bold ring-1",
+                              revealed ? pillPts(totalRoundShown) : NEUTRAL_BADGE,
+                            ].join(" ")}
                           >
-                            {fmtPts(totalRoundSafe)}
+                            {revealed ? fmtPts(totalRoundShown) : "—"}
                           </span>
                         </td>
 
@@ -344,22 +327,23 @@ export default function ResultadosPage() {
                               <span
                                 className={[
                                   "inline-flex items-center justify-center rounded-full px-2.5 py-1 text-xs font-bold ring-1",
-                                  isRevealed ? pillPts(cell.points) : NEUTRAL_BADGE,
+                                  revealed ? pillPts(cell.points) : NEUTRAL_BADGE,
                                 ].join(" ")}
                               >
-                                {isRevealed ? fmtPts(cell.points) : "—"}
+                                {revealed ? fmtPts(cell.points) : "—"}
                               </span>
                             </td>
                           );
                         })}
 
-                        <td className="px-4 py-3 text-center ring-1 ring-slate-200 text-sm font-semibold text-slate-700">
+                        <td className="px-4 py-3 text-center ring-1 ring-slate-200">
                           <span
-                            className={`rounded-full px-2.5 py-1 text-xs font-bold ring-1 ${pillPts(
-                              totalRoundSafe
-                            )}`}
+                            className={[
+                              "rounded-full px-2.5 py-1 text-xs font-bold ring-1",
+                              revealed ? pillPts(totalRoundShown) : NEUTRAL_BADGE,
+                            ].join(" ")}
                           >
-                            {fmtPts(totalRoundSafe)}
+                            {revealed ? fmtPts(totalRoundShown) : "—"}
                           </span>
                         </td>
 
@@ -379,8 +363,8 @@ export default function ResultadosPage() {
         <div className="mt-4 space-y-3 sm:hidden">
           {(data?.players || []).map((pl, pi) => {
             const row = data?.grid?.[pi] || [];
-            const totalRound = row.reduce((acc, c) => acc + (c.points ?? 0), 0);
-            const totalRoundSafe = isRevealed ? totalRound : null;
+            const totalRoundCalc = row.reduce((acc, c) => acc + (c.points ?? 0), 0);
+            const totalRoundShown: number | null = revealed ? totalRoundCalc : null;
 
             const acum = overallMap.get(pl.id) ?? 0;
 
@@ -392,11 +376,12 @@ export default function ResultadosPage() {
                     <div className="mt-1 text-xs text-slate-500">
                       Total rodada:{" "}
                       <span
-                        className={`rounded-full px-2 py-0.5 text-xs font-bold ring-1 ${pillPts(
-                          totalRoundSafe
-                        )}`}
+                        className={[
+                          "rounded-full px-2 py-0.5 text-xs font-bold ring-1",
+                          revealed ? pillPts(totalRoundShown) : NEUTRAL_BADGE,
+                        ].join(" ")}
                       >
-                        {fmtPts(totalRoundSafe)}
+                        {revealed ? fmtPts(totalRoundShown) : "—"}
                       </span>{" "}
                       • Acum.:{" "}
                       <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-700 ring-1 ring-slate-200">
@@ -409,7 +394,6 @@ export default function ResultadosPage() {
                 <div className="mt-3 space-y-2">
                   {(data?.games || []).map((g, gi) => {
                     const cell = row[gi] || { pick: null, points: null };
-
                     return (
                       <div key={g.id} className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2">
                         <div className="text-xs font-semibold text-slate-700">
@@ -421,23 +405,22 @@ export default function ResultadosPage() {
                         </div>
 
                         <div className="flex items-center gap-2">
-                          {/* Palpite: NEUTRO quando não revelado (não vaza 1/X/2 por cor) */}
                           <span
-                            className={`rounded-full px-2.5 py-1 text-xs font-bold ring-1 ${safePickClass(
-                              cell.pick,
-                              isRevealed
-                            )}`}
+                            className={[
+                              "rounded-full px-2.5 py-1 text-xs font-bold ring-1",
+                              revealed ? pickBadge(cell.pick) : NEUTRAL_BADGE,
+                            ].join(" ")}
                           >
-                            {safeText(cell.pick, isRevealed)}
+                            {revealed ? (cell.pick ?? "—") : "—"}
                           </span>
 
-                          {/* Pontos: NEUTRO quando não revelado */}
                           <span
-                            className={`rounded-full px-2.5 py-1 text-xs font-bold ring-1 ${
-                              isRevealed ? pillPts(cell.points) : NEUTRAL_BADGE
-                            }`}
+                            className={[
+                              "rounded-full px-2.5 py-1 text-xs font-bold ring-1",
+                              revealed ? pillPts(cell.points) : NEUTRAL_BADGE,
+                            ].join(" ")}
                           >
-                            {isRevealed ? fmtPts(cell.points) : "—"}
+                            {revealed ? fmtPts(cell.points) : "—"}
                           </span>
                         </div>
                       </div>
@@ -449,8 +432,8 @@ export default function ResultadosPage() {
           })}
         </div>
 
-        {/* RANKINGS (FINAL) */}
-        {data && (
+        {/* RANKINGS (FINAL) — só faz sentido quando revelado */}
+        {data && revealed && (
           <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
             {/* Ranking da Rodada */}
             <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
@@ -468,17 +451,19 @@ export default function ResultadosPage() {
                     className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2"
                   >
                     <div className="flex items-center gap-2">
-                      <span className="w-6 text-center text-sm font-extrabold text-slate-700">{idx + 1}º</span>
+                      <span className="w-6 text-center text-sm font-extrabold text-slate-700">
+                        {idx + 1}º
+                      </span>
                       <span className="text-sm font-bold text-slate-900">{r.name}</span>
                     </div>
 
                     <span
                       className={[
                         "rounded-full px-2.5 py-1 text-xs font-bold ring-1",
-                        isRevealed ? pillPts(r.totalRound) : NEUTRAL_BADGE,
+                        pillPts(r.totalRound),
                       ].join(" ")}
                     >
-                      {isRevealed ? fmtPts(r.totalRound) : "—"}
+                      {fmtPts(r.totalRound)}
                     </span>
                   </div>
                 ))}
@@ -501,7 +486,9 @@ export default function ResultadosPage() {
                     className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2"
                   >
                     <div className="flex items-center gap-2">
-                      <span className="w-6 text-center text-sm font-extrabold text-slate-700">{idx + 1}º</span>
+                      <span className="w-6 text-center text-sm font-extrabold text-slate-700">
+                        {idx + 1}º
+                      </span>
                       <span className="text-sm font-bold text-slate-900">{r.name}</span>
                     </div>
 
