@@ -166,45 +166,57 @@ export default function AdminGamesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function saveGamesStructure() {
-    setBusySaveGames(true);
-    setMsg(null);
-    setMsgKind(null);
+async function saveGamesStructure() {
+  setBusySaveGames(true);
+  setMsg(null);
+  setMsgKind(null);
 
+  try {
+    const payload = {
+      round,
+      games: games.map((g) => ({
+        kickoff_at: toIsoWithLocalTz(g.kickoff_at),
+        team1: g.team1.trim(),
+        team2: g.team2.trim(),
+      })),
+    };
+
+    const r = await fetch("/api/admin/block", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    // 👇 NÃO use mais r.json() direto (pode vir HTML de erro)
+    const raw = await r.text();
+    let j: any = null;
     try {
-      const payload = {
-        round,
-        games: games.map((g) => ({
-          ...(g.id ? { id: g.id } : {}),
-          kickoff_at: toIsoWithLocalTz(g.kickoff_at),
-          team1: g.team1.trim(),
-          team2: g.team2.trim(),
-        })),
-      };
-
-      const r = await fetch("/api/admin/block", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      const j = await r.json();
-      if (!r.ok) {
-        setMsg(j?.error ? `Erro: ${j.error}` : "Erro ao salvar jogos");
-        setMsgKind("err");
-        return;
-      }
-
-      setMsg(`✅ Estrutura salva (rodada ${round}).`);
-      setMsgKind("ok");
-      await loadRound(round);
+      j = raw ? JSON.parse(raw) : null;
     } catch {
-      setMsg("Erro ao salvar (rede/servidor).");
-      setMsgKind("err");
-    } finally {
-      setBusySaveGames(false);
+      // raw não era JSON (provável HTML de erro)
     }
+
+    if (!r.ok) {
+      const msgErr =
+        j?.error ||
+        j?.message ||
+        (raw?.slice(0, 300) ? raw.slice(0, 300) : "Erro ao salvar jogos");
+      setMsg(`Erro: ${msgErr}`);
+      setMsgKind("err");
+      return;
+    }
+
+    setMsg(`✅ Estrutura salva (rodada ${round}).`);
+    setMsgKind("ok");
+    await loadRound(round);
+  } catch (e: any) {
+    setMsg(`Erro ao salvar (rede/servidor): ${e?.message ?? String(e)}`);
+    setMsgKind("err");
+  } finally {
+    setBusySaveGames(false);
   }
+}
+
 
   async function saveScoresOnly() {
     setBusySaveScores(true);
