@@ -1,4 +1,3 @@
-// app/api/results/by-round/route.ts
 import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 
@@ -12,16 +11,14 @@ function calcGabarito(score1: number | null, score2: number | null): OneXTwo | n
   return "X";
 }
 
-// regra do seu bolão 1/X/2:
+// regra 1/X/2 do seu bolão:
 // acerto = +3
 // oposto (1 vs 2) = -1
 // diferente sem ser oposto = 0
-// palpite em empate nunca negativo (X nunca dá -1)
+// palpite em empate nunca negativo
 function calcPoints(pick: OneXTwo, gabarito: OneXTwo): number {
   if (pick === gabarito) return 3;
-  // oposto só existe entre 1 e 2
   if ((pick === "1" && gabarito === "2") || (pick === "2" && gabarito === "1")) return -1;
-  // todo o resto dá 0 (inclui X vs 1/2 e 1/2 vs X)
   return 0;
 }
 
@@ -42,24 +39,27 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "round inválida (1..38)" }, { status: 400 });
     }
 
-    // block da rodada
-    const blocks = await sql`
-      select id, round
-      from public.blocks
-      where round = ${round}
-      limit 1
-    `;
-    const block = blocks?.[0] ?? null;
-
     // players (sempre)
     const playersRows = await sql`
       select id, name
       from public.players
       order by name asc
     `;
-    const players = (playersRows || []).map((p: any) => ({ id: String(p.id), name: String(p.name) }));
+    const players = (playersRows || []).map((p: any) => ({
+      id: String(p.id),
+      name: String(p.name),
+    }));
 
-    // se não tem bloco ainda, devolve vazio (front não quebra)
+    // block da rodada
+    const blockRows = await sql`
+      select id, round
+      from public.blocks
+      where round = ${round}
+      limit 1
+    `;
+    const block = blockRows?.[0] ?? null;
+
+    // se não tem bloco ainda: devolve estrutura vazia (front não quebra)
     if (!block) {
       return NextResponse.json({
         round,
@@ -68,8 +68,8 @@ export async function GET(req: Request) {
         players,
         games: [],
         grid: players.map(() => []),
-        totalsRound: players.map((p) => ({ playerId: p.id, name: p.name, totalRound: 0 })),
-        overall: players.map((p) => ({ playerId: p.id, name: p.name, totalOverall: 0 })),
+        totalsRound: players.map((p: any) => ({ playerId: p.id, name: p.name, totalRound: 0 })),
+        overall: players.map((p: any) => ({ playerId: p.id, name: p.name, totalOverall: 0 })),
       });
     }
 
@@ -84,7 +84,6 @@ export async function GET(req: Request) {
     const games = (gamesRows || []).map((g: any) => {
       const score1 = g.score1 === null || g.score1 === undefined ? null : Number(g.score1);
       const score2 = g.score2 === null || g.score2 === undefined ? null : Number(g.score2);
-
       return {
         id: String(g.id),
         kickoff_at: String(g.kickoff_at),
@@ -99,88 +98,75 @@ export async function GET(req: Request) {
     const kickoffMin: string | null = games.length ? games[0].kickoff_at : null;
     const isRevealed = kickoffMin ? new Date() >= new Date(kickoffMin) : false;
 
-    // ===== picks da rodada (pra montar grid) =====
-    const gameIds = games.map((g) => g.id);
-    let picksRound: any[] = [];
+    // =========================
+    // PICKS DA RODADA (SEM ARRAY): JOIN picks -> games -> blocks
+    // =========================
+    const picksRoundRows = await sql`
+      select
+        p.player_id,
+        p.game_id,
+        p.choice,
+        g.score1,
+        g.score2
+      from public.picks p
+      join public.games g on g.id = p.game_id
+      where g.block_id = ${block.id}
+    `;
 
-    if (gameIds.length) {
-      picksRound = await sql`
-        select player_id, game_id, choice
-        from public.picks
-        where game_id = any(${gameIds}::uuid[])
-      `;
-    }
-
-    // index: pickByPlayerGame[playerId][gameId] = OneXTwo
+    // index pickByPlayerGame[playerId][gameId] = pick 1/X/2
     const pickByPlayerGame = new Map<string, Map<string, OneXTwo>>();
-    for (const row of picksRound || []) {
-      const playerId = String(row.player_id);
-      const gameId = String(row.game_id);
-      const pick = mapChoiceToOneXTwo((row.choice ?? null) as Choice | null);
+    for (const row of picksRoundRows || []) {
+      const playerId = String((row as any).player_id);
+      const gameId = String((row as any).game_id);
+      const pick = mapChoiceToOneXTwo(((row as any).choice ?? null) as Choice | null);
       if (!pick) continue;
 
       if (!pickByPlayerGame.has(playerId)) pickByPlayerGame.set(playerId, new Map());
       pickByPlayerGame.get(playerId)!.set(gameId, pick);
     }
 
-    // grid: players x games
-    const grid = players.map((p) => {
-      const byGame = pickByPlayerGame.get(p.id) || new Map<string, OneXTwo>();
-      return games.map((g) => {
+    // grid players x games
+    const grid = players.map((pl: any) => {
+      const byGame = pickByPlayerGame.get(pl.id) || new Map<string, OneXTwo>();
+      return games.map((g: any) => {
         const pick = byGame.get(g.id) ?? null;
-
-        // pontos só existem se tiver gabarito
-        if (!pick || !g.gabarito) {
-          return { pick, points: null };
-        }
-
-        const points = calcPoints(pick, g.gabarito);
-        return { pick, points };
+        if (!pick || !g.gabarito) return { pick, points: null };
+        return { pick, points: calcPoints(pick, g.gabarito) };
       });
     });
 
-    // totalsRound (ranking da rodada)
+    // totalsRound (ranking rodada)
     const totalsRound = players
-      .map((p, pi) => {
+      .map((p: any, pi: number) => {
         const row = grid[pi] || [];
-        const totalRound = row.reduce((acc, c) => acc + (c.points ?? 0), 0);
+        const totalRound = row.reduce((acc: number, c: any) => acc + (c.points ?? 0), 0);
         return { playerId: p.id, name: p.name, totalRound };
       })
-      .sort((a, b) => (b.totalRound - a.totalRound) || a.name.localeCompare(b.name, "pt-BR"));
+      .sort((a: any, b: any) => (b.totalRound - a.totalRound) || a.name.localeCompare(b.name, "pt-BR"));
 
-    // ===== overall (acumulado em todos os jogos COM placar) =====
-    const gamesScoredRows = await sql`
-      select id, score1, score2
-      from public.games
-      where score1 is not null and score2 is not null
+    // =========================
+    // OVERALL (ACUMULADO) — SOMENTE JOGOS COM PLACAR (SEM ARRAY): JOIN picks -> games (com placar)
+    // =========================
+    const picksScoredRows = await sql`
+      select
+        p.player_id,
+        p.choice,
+        g.score1,
+        g.score2
+      from public.picks p
+      join public.games g on g.id = p.game_id
+      where g.score1 is not null and g.score2 is not null
     `;
-
-    const scoredGames = (gamesScoredRows || []).map((g: any) => ({
-      id: String(g.id),
-      gabarito: calcGabarito(Number(g.score1), Number(g.score2)) as OneXTwo, // aqui sempre existe
-    }));
-
-    const scoredIds = scoredGames.map((g) => g.id);
-    let picksAll: any[] = [];
-    if (scoredIds.length) {
-      picksAll = await sql`
-        select player_id, game_id, choice
-        from public.picks
-        where game_id = any(${scoredIds}::uuid[])
-      `;
-    }
-
-    const gabaritoByGame = new Map<string, OneXTwo>();
-    for (const g of scoredGames) gabaritoByGame.set(g.id, g.gabarito);
 
     const totalOverallByPlayer = new Map<string, number>();
     for (const p of players) totalOverallByPlayer.set(p.id, 0);
 
-    for (const row of picksAll || []) {
-      const playerId = String(row.player_id);
-      const gameId = String(row.game_id);
-      const pick = mapChoiceToOneXTwo((row.choice ?? null) as Choice | null);
-      const gab = gabaritoByGame.get(gameId);
+    for (const row of picksScoredRows || []) {
+      const playerId = String((row as any).player_id);
+      const pick = mapChoiceToOneXTwo(((row as any).choice ?? null) as Choice | null);
+      const s1 = (row as any).score1 === null || (row as any).score1 === undefined ? null : Number((row as any).score1);
+      const s2 = (row as any).score2 === null || (row as any).score2 === undefined ? null : Number((row as any).score2);
+      const gab = calcGabarito(s1, s2);
 
       if (!pick || !gab) continue;
 
@@ -189,12 +175,12 @@ export async function GET(req: Request) {
     }
 
     const overall = players
-      .map((p) => ({
+      .map((p: any) => ({
         playerId: p.id,
         name: p.name,
         totalOverall: totalOverallByPlayer.get(p.id) ?? 0,
       }))
-      .sort((a, b) => (b.totalOverall - a.totalOverall) || a.name.localeCompare(b.name, "pt-BR"));
+      .sort((a: any, b: any) => (b.totalOverall - a.totalOverall) || a.name.localeCompare(b.name, "pt-BR"));
 
     return NextResponse.json({
       round,
