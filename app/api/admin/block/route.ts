@@ -2,14 +2,15 @@ import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 
 type GameInput = {
-  id?: string | null;
-  kickoff_at: string; // ISO string
+  id?: string | null;      // <-- AGORA ACEITA ID
+  kickoff_at: string;      // ISO string
   team1: string;
   team2: string;
 };
 
 export async function POST(req: Request) {
   const body = (await req.json()) as { round: number; games: GameInput[] };
+
   const round = body?.round;
   const games = body?.games;
 
@@ -29,55 +30,62 @@ export async function POST(req: Request) {
     returning id, round
   `;
 
-  // valida campos
-  for (const g of games) {
-    const kickoff = g.kickoff_at?.trim();
-    const team1 = g.team1?.trim();
-    const team2 = g.team2?.trim();
-    if (!kickoff || !team1 || !team2) {
-      return NextResponse.json({ error: "Jogo com campos vazios" }, { status: 400 });
+  // Se a rodada já existe (tem jogos), EXIGIMOS que venham 5 ids:
+  const [cnt] = await sql`
+    select count(*)::int as n
+    from public.games
+    where block_id = ${block.id}
+  `;
+  const existingCount = cnt?.n ?? 0;
+
+  if (existingCount > 0) {
+    const ids = games.map((g) => (g.id ?? "").trim()).filter(Boolean);
+    if (ids.length !== 5) {
+      return NextResponse.json(
+        { error: "Rodada já existe. Para editar, envie os 5 IDs (não posso duplicar)." },
+        { status: 400 }
+      );
     }
   }
 
-  // atualiza/insere sem apagar nada
-  const savedIds: string[] = [];
-
+  // UPSERT POR ID (se veio id -> UPDATE; se não veio -> INSERT)
   for (const g of games) {
-    const id = (g.id ?? null) as string | null;
-    const kickoff = g.kickoff_at.trim();
-    const team1 = g.team1.trim();
-    const team2 = g.team2.trim();
+    const id = (g.id ?? "").trim();
+    const kickoff = (g.kickoff_at ?? "").trim();
+    const team1 = (g.team1 ?? "").trim();
+    const team2 = (g.team2 ?? "").trim();
+
+    if (!kickoff || !team1 || !team2) {
+      return NextResponse.json({ error: "Jogo com campos vazios" }, { status: 400 });
+    }
 
     if (id) {
-      // update do jogo existente (e garante que pertence ao bloco)
-      const res = await sql`
+      // UPDATE: NÃO troca id, NÃO apaga picks
+      const updated = await sql`
         update public.games
            set kickoff_at = ${kickoff},
                team1 = ${team1},
                team2 = ${team2}
          where id = ${id}
            and block_id = ${block.id}
-        returning id
+         returning id
       `;
 
-      if (res.length === 0) {
+      // Se por algum motivo esse id não pertence ao bloco, recusa (evita bagunça)
+      if (!updated || updated.length === 0) {
         return NextResponse.json(
-          { error: `game id inválido para esta rodada: ${id}` },
+          { error: "ID inválido para esta rodada (block). Não salvei para evitar duplicação." },
           { status: 400 }
         );
       }
-
-      savedIds.push(res[0].id);
     } else {
-      // insert novo (só se não tiver id)
-      const [ins] = await sql`
+      // INSERT: só acontece quando a rodada ainda não existia
+      await sql`
         insert into public.games (block_id, kickoff_at, team1, team2)
         values (${block.id}, ${kickoff}, ${team1}, ${team2})
-        returning id
       `;
-      savedIds.push(ins.id);
     }
   }
 
-  return NextResponse.json({ ok: true, block, savedIds });
+  return NextResponse.json({ ok: true, block });
 }
