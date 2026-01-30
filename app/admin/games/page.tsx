@@ -175,6 +175,7 @@ async function saveGamesStructure() {
     const payload = {
       round,
       games: games.map((g) => ({
+        id: g.id ?? null,
         kickoff_at: toIsoWithLocalTz(g.kickoff_at),
         team1: g.team1.trim(),
         team2: g.team2.trim(),
