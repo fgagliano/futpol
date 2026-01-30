@@ -188,23 +188,24 @@ async function saveGamesStructure() {
     });
 
     // 👇 NÃO use mais r.json() direto (pode vir HTML de erro)
-    const raw = await r.text();
-    let j: any = null;
-    try {
-      j = raw ? JSON.parse(raw) : null;
-    } catch {
-      // raw não era JSON (provável HTML de erro)
-    }
+   const ct = r.headers.get("content-type") || "sem content-type";
+const raw = await r.text();
 
-    if (!r.ok) {
-      const msgErr =
-        j?.error ||
-        j?.message ||
-        (raw?.slice(0, 300) ? raw.slice(0, 300) : "Erro ao salvar jogos");
-      setMsg(`Erro: ${msgErr}`);
-      setMsgKind("err");
-      return;
-    }
+let j: any = null;
+try {
+  j = raw ? JSON.parse(raw) : null;
+} catch {}
+
+if (!r.ok) {
+  const snippet =
+    (j?.error || j?.message) ??
+    (raw ? raw.slice(0, 300) : "(sem body)");
+
+  setMsg(`Erro: HTTP ${r.status} ${r.statusText} • ${ct} • ${snippet}`);
+  setMsgKind("err");
+  return;
+}
+
 
     setMsg(`✅ Estrutura salva (rodada ${round}).`);
     setMsgKind("ok");
