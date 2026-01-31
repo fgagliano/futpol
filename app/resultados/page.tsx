@@ -122,17 +122,13 @@ export default function ResultadosPage() {
           </div>
 
           <button
-            onClick={() => load(round)}
-            disabled={loading}
-            className={[
-              "rounded-2xl px-4 py-2 text-sm font-semibold shadow-sm",
-              loading
-                ? "bg-slate-200 text-slate-500 cursor-not-allowed"
-                : "bg-emerald-600 text-white hover:bg-emerald-700",
-            ].join(" ")}
-          >
-            {loading ? "Carregando…" : "Atualizar"}
-          </button>
+  type="button"
+  onClick={() => (window.location.href = "/")}
+  className="rounded-2xl bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
+>
+  Home
+</button>
+
         </div>
 
         <div className="mt-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
