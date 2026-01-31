@@ -84,8 +84,21 @@ export default function ResultadosPage() {
     }
   }
 
+  // ✅ abre na maior rodada que tenha jogos cadastrados
   useEffect(() => {
-    load(1);
+    (async () => {
+      try {
+        const r = await fetch(`/api/round/latest?ts=${Date.now()}`, { cache: "no-store" });
+        const j = await r.json();
+        const latest = Number(j?.round ?? 1) || 1;
+
+        setRound(latest);
+        await load(latest);
+      } catch {
+        setRound(1);
+        await load(1);
+      }
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -144,7 +157,9 @@ export default function ResultadosPage() {
             </div>
 
             <div className="text-xs text-slate-500">
-              {data ? `Rodada carregada: ${data.round} • ${revealed ? "revelada" : "ainda bloqueada"}` : "—"}
+              {data
+                ? `Rodada carregada: ${data.round} • ${revealed ? "revelada" : "ainda bloqueada"}`
+                : "—"}
             </div>
           </div>
 
@@ -230,7 +245,9 @@ export default function ResultadosPage() {
                   ))}
 
                   <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wide text-slate-600 ring-1 ring-slate-200">
-                    Total<br />Rodada
+                    Total
+                    <br />
+                    Rodada
                   </th>
                   <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wide text-slate-600 ring-1 ring-slate-200">
                     Acum.
@@ -248,9 +265,7 @@ export default function ResultadosPage() {
                   {(data?.games || []).map((g) => (
                     <td key={g.id} className="px-4 py-3 ring-1 ring-slate-200">
                       <div className="flex items-center justify-between">
-                        <span className="text-sm font-semibold text-slate-900">
-                          {g.gabarito ?? "—"}
-                        </span>
+                        <span className="text-sm font-semibold text-slate-900">{g.gabarito ?? "—"}</span>
                         <span className="text-xs font-semibold text-slate-600">
                           {g.score1 !== null && g.score2 !== null ? `${g.score1}x${g.score2}` : ""}
                         </span>
@@ -258,8 +273,12 @@ export default function ResultadosPage() {
                     </td>
                   ))}
 
-                  <td className="px-4 py-3 text-center ring-1 ring-slate-200 text-sm font-semibold text-slate-700">—</td>
-                  <td className="px-4 py-3 text-center ring-1 ring-slate-200 text-sm font-semibold text-slate-700">—</td>
+                  <td className="px-4 py-3 text-center ring-1 ring-slate-200 text-sm font-semibold text-slate-700">
+                    —
+                  </td>
+                  <td className="px-4 py-3 text-center ring-1 ring-slate-200 text-sm font-semibold text-slate-700">
+                    —
+                  </td>
                 </tr>
 
                 {/* PLAYERS: 2 linhas por jogador */}
@@ -446,23 +465,13 @@ export default function ResultadosPage() {
 
               <div className="mt-3 space-y-2">
                 {data.totalsRound.map((r, idx) => (
-                  <div
-                    key={r.playerId}
-                    className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2"
-                  >
+                  <div key={r.playerId} className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2">
                     <div className="flex items-center gap-2">
-                      <span className="w-6 text-center text-sm font-extrabold text-slate-700">
-                        {idx + 1}º
-                      </span>
+                      <span className="w-6 text-center text-sm font-extrabold text-slate-700">{idx + 1}º</span>
                       <span className="text-sm font-bold text-slate-900">{r.name}</span>
                     </div>
 
-                    <span
-                      className={[
-                        "rounded-full px-2.5 py-1 text-xs font-bold ring-1",
-                        pillPts(r.totalRound),
-                      ].join(" ")}
-                    >
+                    <span className={["rounded-full px-2.5 py-1 text-xs font-bold ring-1", pillPts(r.totalRound)].join(" ")}>
                       {fmtPts(r.totalRound)}
                     </span>
                   </div>
@@ -481,14 +490,9 @@ export default function ResultadosPage() {
 
               <div className="mt-3 space-y-2">
                 {data.overall.map((r, idx) => (
-                  <div
-                    key={r.playerId}
-                    className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2"
-                  >
+                  <div key={r.playerId} className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2">
                     <div className="flex items-center gap-2">
-                      <span className="w-6 text-center text-sm font-extrabold text-slate-700">
-                        {idx + 1}º
-                      </span>
+                      <span className="w-6 text-center text-sm font-extrabold text-slate-700">{idx + 1}º</span>
                       <span className="text-sm font-bold text-slate-900">{r.name}</span>
                     </div>
 
