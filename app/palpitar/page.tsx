@@ -121,7 +121,7 @@ export default function PalpitarPage() {
 
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });
-    window.location.href = "/login?next=/palpitar";
+    window.location.href = "/";
   }
 
   return (
