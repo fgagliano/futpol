@@ -162,9 +162,25 @@ export default function AdminGamesPage() {
   }
 
   useEffect(() => {
-    loadRound(1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  (async () => {
+    try {
+      const r = await fetch(`/api/admin/last-round?ts=${Date.now()}`, {
+        cache: "no-store",
+      });
+      const j = await r.json();
+      const last = Number(j?.lastRound);
+
+      // proteção: se vier lixo, cai em 1
+      const target = Number.isFinite(last) && last >= 1 && last <= 38 ? last : 1;
+
+      await loadRound(target);
+    } catch {
+      await loadRound(1);
+    }
+  })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, []);
+
 
 async function saveGamesStructure() {
   setBusySaveGames(true);
