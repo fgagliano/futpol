@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export async function GET() {
   try {
-    // Maior rodada que tem pelo menos 1 jogo
     const rows = await sql`
       select coalesce(max(b.round), 1) as round
       from public.blocks b
@@ -14,11 +16,19 @@ export async function GET() {
       )
     `;
 
-    const round = Number(rows?.[0]?.round ?? 1);
+    const round = Number(rows?.[0]?.round ?? 1) || 1;
 
-    return NextResponse.json({ round });
+    const res = NextResponse.json({ round });
+    // reforço extra contra cache intermediário (CDN/edge)
+    res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    res.headers.set("Pragma", "no-cache");
+    res.headers.set("Expires", "0");
+    return res;
   } catch (e: any) {
-    // fallback seguro
-    return NextResponse.json({ round: 1, error: "failed" }, { status: 200 });
+    const res = NextResponse.json({ round: 1, error: "failed" }, { status: 200 });
+    res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    res.headers.set("Pragma", "no-cache");
+    res.headers.set("Expires", "0");
+    return res;
   }
 }
