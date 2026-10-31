@@ -29,16 +29,20 @@ export async function GET() {
     order by name asc
   `) as any[];
 
-  // jogos com placar preenchido (só esses contam no ranking)
+  // jogos com placar preenchido + o número da rodada
   const games = (await sql`
-    select id, team1, team2, score1, score2
-    from public.games
-    where score1 is not null and score2 is not null
+    select g.id, g.team1, g.team2, g.score1, g.score2, b.round
+    from public.games g
+    join public.blocks b on g.block_id = b.id
+    where g.score1 is not null and g.score2 is not null
   `) as any[];
 
-  const gameResult = new Map<string, Choice>();
+  const gameDataMap = new Map<string, { real: Choice, round: number }>();
   for (const g of games) {
-    gameResult.set(g.id, resultFromScore(Number(g.score1), Number(g.score2)));
+    gameDataMap.set(g.id, {
+      real: resultFromScore(Number(g.score1), Number(g.score2)),
+      round: Number(g.round)
+    });
   }
 
   const picks = games.length
@@ -54,8 +58,10 @@ export async function GET() {
   for (const t of totals) byId.set(t.playerId, t);
 
   for (const p of picks) {
-    const real = gameResult.get(p.game_id);
-    if (!real) continue;
+    const gameData = gameDataMap.get(p.game_id);
+    if (!gameData) continue;
+    
+    const { real, round } = gameData;
 
     let pick: Choice;
     try {
@@ -64,7 +70,13 @@ export async function GET() {
       continue;
     }
 
-    const pts = pointsForPick(real, pick);
+    let pts = pointsForPick(real, pick);
+    
+    // Regra: Pontos a dobrar nas rodadas 34 a 38
+    if (round >= 34 && round <= 38) {
+      pts = pts * 2;
+    }
+
     byId.get(p.player_id)!.total += pts;
   }
 
