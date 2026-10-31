@@ -122,7 +122,13 @@ export async function GET(req: Request) {
         continue;
       }
 
-      const pts = pointsForPick(real, pick);
+      let pts = pointsForPick(real, pick);
+      
+      // Regra: Pontos em dobro nas rodadas 34 a 38
+      if (block.round >= 34 && block.round <= 38) {
+        pts = pts * 2;
+      }
+
       t.perGame[gi].points = pts;
       t.total += pts;
 
