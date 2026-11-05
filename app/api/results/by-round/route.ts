@@ -17,17 +17,19 @@ function to1X2(c: Choice): OneXTwo {
   return "X";
 }
 
-function pointsForPick(real: Choice, pick: Choice): number {
-  if (pick === real) return 3;
+function pointsForPick(real: Choice, pick: Choice, round: number): number {
+  let points = 0;
 
-  // empate nunca dá negativo
-  if (real === "DRAW") return 0;
+  if (pick === real) {
+    points = 3;
+  } else if (
+    (real === "TEAM1" && pick === "TEAM2") ||
+    (real === "TEAM2" && pick === "TEAM1")
+  ) {
+    points = -1;
+  }
 
-  // oposto (1<->2) dá -1
-  const isOpposite =
-    (real === "TEAM1" && pick === "TEAM2") || (real === "TEAM2" && pick === "TEAM1");
-
-  return isOpposite ? -1 : 0;
+  return round >= 34 ? points * 2 : points;
 }
 
 export const dynamic = "force-dynamic";
@@ -125,7 +127,7 @@ export async function GET(req: Request) {
           return { pick: pick1x2, points: null };
         }
 
-        return { pick: pick1x2, points: pointsForPick(real, pickChoice) };
+        return { pick: pick1x2, points: pointsForPick(real, pickChoice, round) };
       })
     );
 
@@ -137,14 +139,18 @@ export async function GET(req: Request) {
 
     // acumulado geral (todos os jogos com placar, todas as rodadas)
     const gamesScoredAll = (await sql`
-      select id, score1, score2
-      from public.games
-      where score1 is not null and score2 is not null
-    `) as any[];
+  select g.id, g.score1, g.score2, b.round
+  from public.games g
+  join public.blocks b on b.id = g.block_id
+  where g.score1 is not null and g.score2 is not null
+`) as any[];
 
-    const realAll = new Map<string, Choice>();
+    const realAll = new Map<string, { real: Choice; round: number }>();
     for (const g of gamesScoredAll) {
-      realAll.set(g.id, resultFromScore(Number(g.score1), Number(g.score2)));
+      realAll.set(g.id, {
+        real: resultFromScore(Number(g.score1), Number(g.score2)),
+        round: Number(g.round),
+      });
     }
 
     const picksAll = gamesScoredAll.length
@@ -160,8 +166,8 @@ export async function GET(req: Request) {
     for (const t of overall) overallMap.set(t.playerId, t);
 
     for (const p of picksAll) {
-      const real = realAll.get(p.game_id);
-      if (!real) continue;
+      const gameInfo = realAll.get(p.game_id);
+      if (!gameInfo) continue;
 
       let pickChoice: Choice;
       try {
@@ -171,7 +177,13 @@ export async function GET(req: Request) {
       }
 
       const row = overallMap.get(p.player_id);
-      if (row) row.totalOverall += pointsForPick(real, pickChoice);
+      if (row) {
+        row.totalOverall += pointsForPick(
+          gameInfo.real,
+          pickChoice,
+          gameInfo.round
+        );
+      }
     }
 
     // ordenações para exibição (ranking)
